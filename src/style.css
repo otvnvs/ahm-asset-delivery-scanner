@@ -80,18 +80,20 @@ a:active {
 /* -------------------------------------------------------------------------------- */
 /* Core layout baseline properties (Shared / Mobile First) */
 .minimal-container {
+	/*
   font-family: monospace;
   box-sizing: border-box;
   padding: 10px;
   text-align: center;
   margin: 0 auto;
   width: 100%;
+	*/
 }
 
 /* MOBILE VIEWPORTS SHIELD: Applies constraints ONLY when running on small phone glass screens */
 @media (max-width: 480px) {
   .minimal-container {
-    max-width: 320px;
+    /*max-width: 320px;*/
     margin: 40px auto;
   }
 }
@@ -99,7 +101,7 @@ a:active {
 /* DESKTOP VIEWPORTS SHIELD: Expands elements edge-to-edge when loaded in large desktop browsers */
 @media (min-width: 481px) {
   .minimal-container {
-    max-width: 100%;
+    /*max-width: 100%;*/
     padding: 20px 40px;
   }
 }

@@ -32,11 +32,26 @@ A lightweight mobile asset for [Android Hybrid Mobile](https://github.com/otvnvs
 
 This project is built using standard web technologies and is structured to be consumed natively by the AHM shell application.
 
-### Local Preview
-Simply open the entry point file in any standard browser:
-```text
-index.html
+### RUnning
+
+The project can be served up using a standard web server, `index.html` will bootstrap the SFC version of the application.
+
+You can use the following to run in SFC mode:
+
+* `npm run serve` : serve root directory 
+
+You can also run it using vite. Install as follows
+
+```bash
+npm install
 ```
+
+With the dependencies installed you can use the following to run and build the project:
+
+* `npm run vite:start` : development
+* `npm run vite:preview` : production testing
+* `npm run vite:dist` : production preparation
+
 
 ### Production Package
 Ensure the output bundle is zipped and hosted on GitHub Releases or a accessible repository link for the [Android Hybrid Mobile](https://github.com/otvnvs/android-hybrid-mobile) app to pull down, unzip, and render natively. Simply enter the repository zip download link (`https://github.com/otvnvs/ahm-asset-odata-client/archive/refs/heads/main.zip`) in the maintenance screen and hit update.

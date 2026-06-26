@@ -44,11 +44,13 @@ onMounted(() => {
 <style>
 /* Shared minimalistic design layouts */
 .minimal-container {
+	/*
   font-family: monospace;
   max-width: 320px;
   margin: 40px auto;
   padding: 10px;
   text-align: center;
+	*/
 }
 .view-wrapper { width: 100%; }
 .view-header {

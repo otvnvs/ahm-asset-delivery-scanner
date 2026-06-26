@@ -4,11 +4,12 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "vite",
-    "preview": "vite preview",
+    "vite:start": "vite",
+    "vite:preview": "vite preview",
+    "vite:dist": "vite build",
+    "serve": "python -m http.server 8000 --directory ./",
     "serve:dist": "python -m http.server 8000 --directory ./dist",
-    "serve:sfc": "python -m http.server 1234",
-    "dist": "vite build"
+    "serve:sfc": "python -m http.server 1234"
   },
   "keywords": [],
   "author": "",
