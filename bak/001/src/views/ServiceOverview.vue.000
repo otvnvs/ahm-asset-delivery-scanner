@@ -1,0 +1,130 @@
+<template>
+  <div class="view-wrapper overview-wrapper">
+    <div class="view-header">Overview: {{ entityName }}</div>
+
+    <div v-if="loading" class="status-box text-center">Fetching live row entities...</div>
+    <div v-else-if="errorMessage" class="status-box error-txt text-center">{{ errorMessage }}</div>
+    
+    <div v-else class="data-container">
+      <p class="record-count">Records found: {{ recordItems.length }}</p>
+
+      <div v-if="recordItems.length === 0" class="status-box text-center">Collection table is currently empty.</div>
+
+      <!-- Minimalist Data Row Looping Grid -->
+      <div v-else v-for="(row, index) in recordItems" :key="index" class="data-row-card">
+        <div class="row-badge">#{{ index + 1 }}</div>
+        <div class="properties-list">
+          <div v-for="(val, key) in filterRowFields(row)" :key="key" class="property-line">
+            <span class="prop-key">{{ key }}:</span>
+            <span class="prop-val">{{ val }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="button-row">
+      <router-link to="/services" class="action-btn back-btn">➔ Return to Services</router-link>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
+import { store } from '../util/store.js';
+
+const route = useRoute();
+const entityName = route.params.entityName;
+
+const recordItems = ref([]);
+const loading = ref(true);
+const errorMessage = ref('');
+
+// Helper method filtering out noise properties like metadata links (__metadata / @odata.context)
+const filterRowFields = (rowObject) => {
+  const cleanObject = {};
+  for (const [key, value] of Object.entries(rowObject)) {
+    if (!key.startsWith('@') && !key.startsWith('__') && typeof value !== 'object') {
+      cleanObject[key] = value;
+    }
+  }
+  return cleanObject;
+};
+
+onMounted(async () => {
+  const { odataUrl, username, password } = store.config || {};
+  
+  // Clean up trails and point exactly to the runtime data entity address path
+  const cleanBase = odataUrl.replace(/\/+$/, '');
+  const targetEndpoint = `${cleanBase}/${entityName}`;
+
+  try {
+    const credentials = btoa(`${username}:${password}`);
+    const response = await fetch(targetEndpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Accept': 'application/json'
+      }
+    });
+
+    if (!response.ok) throw new Error(`HTTP Error status ${response.status}`);
+    
+    const payload = await response.getJson ? await response.getJson() : await response.json();
+    
+    // OData v4 outputs records nested inside a 'value' property array node structure
+    recordItems.value = payload.value || (Array.isArray(payload) ? payload : [payload]);
+  } catch (err) {
+    console.error("[OVERVIEW DATA FETCH ERROR]:", err);
+    errorMessage.value = 'Failed to execute query command against target collection rows.';
+  } finally {
+    loading.value = false;
+  }
+});
+</script>
+
+<style scoped>
+.overview-wrapper { text-align: left; box-sizing: border-box; padding: 0 10px; }
+.record-count { font-family: monospace; font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 15px; }
+
+.data-row-card {
+  background-color: #161616;
+  border: 1px solid #2d2d2d;
+  border-left: 3px solid #4eb5f1;
+  padding: 12px;
+  margin-bottom: 12px;
+  border-radius: 4px;
+  position: relative;
+  font-family: monospace;
+}
+.row-badge {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  font-size: 10px;
+  background-color: #2a2a2a;
+  color: #888;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+.properties-list { margin-top: 5px; }
+.property-line {
+  font-size: 13px;
+  line-height: 1.5;
+  margin-bottom: 4px;
+  display: flex;
+  flex-wrap: wrap;
+}
+.prop-key { color: #888; font-weight: bold; margin-right: 6px; }
+.prop-val { color: #ffffff; word-break: break-all; }
+
+.button-row { margin-top: 30px; }
+.action-btn { font-family: monospace; font-size: 14px; padding: 12px 16px; cursor: pointer; text-align: center; border-radius: 4px; text-decoration: none; display: block; width: 100%; box-sizing: border-box; }
+.back-btn { background: transparent; color: #ffffff; border: 1px solid #444; }
+.back-btn:hover { background: rgba(255, 255, 255, 0.05); }
+
+.status-box { font-family: monospace; font-size: 13px; color: #888; padding: 25px 0; }
+.error-txt { color: #e63946; }
+.text-center { text-align: center; }
+</style>
+

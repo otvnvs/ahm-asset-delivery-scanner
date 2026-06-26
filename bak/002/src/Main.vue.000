@@ -1,0 +1,94 @@
+<template>
+  <div class="app-container">
+    <h3>src/Main.vue</h3>
+
+    <!-- HTML Link Navigation -->
+    <nav class="navigation-bar">
+      <a href="#/">Home (Page 1)</a>
+      <a href="#/page2/1?user=john_doe&mode=dark">Page 2 (via HTML Link)</a>
+    </nav>
+
+    <!-- Programmatic Button Navigation -->
+    <div class="button-group">
+      <button @click="navigateExample1">Style 1: Plain String Path</button>
+      <button @click="navigateExample2">Style 2: Path Object with Query</button>
+      <button @click="navigateExample3">Style 3: Named Route (Params + Query)</button>
+    </div>
+
+    <hr />
+    <router-view></router-view>
+    <hr />
+    <Test />
+  </div>
+  <RefreshButton />
+</template>
+
+<script setup>
+import Test from './components/Test.vue';
+import { useRouter } from 'vue-router';
+import { a } from "./util/test.js";
+import { register, unregister  } from "./util/keyboard.js";
+import RefreshButton from './components/RefreshButton.vue';
+
+
+a();
+register();
+const router = useRouter();
+
+// Style 1: Direct String Construction
+function navigateExample1() {
+  router.push('/page2/2?user=zohn_moe&mode=light');
+}
+
+// Style 2: Explicit Path String with Separated Query Object
+function navigateExample2() {
+  router.push({
+    path: '/page2/3',
+    query: {
+      user: 'bohn_zoe',
+      mode: 'medium'
+    }
+  });
+}
+
+// Style 3: Decoupled Named Route Configuration (Safe, Scales Best)
+function navigateExample3() {
+  router.push({
+    name: 'test',
+    params: {
+      id: '4'
+    },
+    query: {
+      user: 'kohn_loe',
+      mode: 'extreme'
+    }
+  });
+}
+</script>
+
+<style scoped>
+.app-container { font-family: sans-serif; padding: 20px; }
+.navigation-bar { display: flex; gap: 15px; margin: 15px 0; }
+.navigation-bar a { text-decoration: none; color: #0066cc; font-weight: bold; padding: 5px 10px; border: 1px solid #0066cc; border-radius: 4px; }
+.navigation-bar a:hover { background-color: #f0f7ff; }
+
+/* Styles for your new programmatic buttons */
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin: 15px 0;
+}
+.button-group button {
+  background-color: #4eb5f1;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.button-group button:hover {
+  background-color: #0066cc;
+}
+</style>
+
