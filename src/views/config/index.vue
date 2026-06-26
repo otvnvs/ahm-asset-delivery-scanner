@@ -102,7 +102,7 @@ import { useRouter } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
 import { store, storeActions } from '../../util/store.js';
 import { testODataConnection } from '../../util/odata.js';
-import { syncServiceWorkerState } from '../../util/sw.js'; 
+//import { syncServiceWorkerState } from '../../util/sw.js'; 
 
 const router = useRouter();
 const saveSuccess = ref(false);
@@ -149,7 +149,7 @@ const handleSaveConfig = () => {
   );
   
   // Synchronizes proxy interception layer instantly upon configuration save
-  syncServiceWorkerState();
+  // syncServiceWorkerState();
 
   saveSuccess.value = true;
   setTimeout(() => {

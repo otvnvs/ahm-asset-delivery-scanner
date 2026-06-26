@@ -14,7 +14,7 @@ export async function bootstrapSfcApp() {
   document.head.appendChild(script);
   
   const VueRouter = window.VueRouter;
-
+/*
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('./sw.sfc.js')
@@ -22,6 +22,7 @@ export async function bootstrapSfcApp() {
         .catch(err => console.error('Worker registration failed:', err));
     });
   }
+*/
 
   const customJsCache = {};
 

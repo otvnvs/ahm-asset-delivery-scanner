@@ -1,2 +1,2 @@
 #!/bin/bash
-darkhttpd ./ --port 1234
+darkhttpd ./ --port 4321

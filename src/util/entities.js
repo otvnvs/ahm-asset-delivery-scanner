@@ -1,50 +1,46 @@
 import { odataFetch } from './odata.js';
 
 /**
- * --- DATA ADAPTER MAPS ---
- * These normalizers isolate the frontend view keys from backend schema names.
- * If backend parameters change or migrate, modify the mapping keys inside these functions.
+ * --- SAP DATA ADAPTER NORMALIZERS ---
  */
 
-function normalizeDeliveryHeader(rawHeader) {
-  if (!rawHeader) return null;
+function normalizeSAPHeader(sapHeader) {
+  if (!sapHeader) return null;
   return {
-    id: rawHeader.ID || '',
-    deliveryNumber: rawHeader.deliveryNumber || '',
-    storageLocationId: rawHeader.storageLocation_id || '',
-    sscc: rawHeader.sscc || 'N/A',
-    deliveryReference: rawHeader.deliveryReference || 'None',
-    pallets: parseInt(rawHeader.pallets, 10) || 0,
-    cartons: parseInt(rawHeader.cartons, 10) || 0,
-    dateReceived: rawHeader.dateReceived ? formatDate(rawHeader.dateReceived) : '',
-    status: rawHeader.status || 'PEND',
-    // Recursively normalize children array collections if expanded by backend
-    items: Array.isArray(rawHeader.items) ? rawHeader.items.map(normalizeDeliveryItem) : []
+    id: sapHeader.PurchaseOrder || '',
+    deliveryNumber: sapHeader.PurchaseOrder || '',
+    storageLocationId: sapHeader.Plant || '', 
+    sscc: sapHeader.Supplier || 'N/A',
+    deliveryReference: sapHeader.SupplierName || 'None',
+    pallets: 0, 
+    cartons: 0,
+    dateReceived: sapHeader.PurchaseOrderDate ? formatSAPDate(sapHeader.PurchaseOrderDate) : '',
+    status: 'PEND', 
+    items: Array.isArray(sapHeader._Items) ? sapHeader._Items.map(normalizeSAPItem) : []
   };
 }
 
-function normalizeDeliveryItem(rawItem) {
-  if (!rawItem) return null;
+function normalizeSAPItem(sapItem) {
+  if (!sapItem) return null;
   return {
-    id: rawItem.ID || '',
-    deliveryId: rawItem.delivery_ID || '',
-    code: rawItem.articleCode || '',
-    itemNumber: rawItem.itemNumber || '',
-    description: rawItem.description || '',
-    recptQty: parseInt(rawItem.recptQty, 10) || 0,
-    targetQty: parseInt(rawItem.targetQty, 10) || 0,
-    uom: rawItem.uom || 'EA',
-    vendorId: rawItem.vendorId || '',
+    id: `${sapItem.PurchaseOrder}-${sapItem.PurchaseOrderItem}`, 
+    deliveryId: sapItem.PurchaseOrder || '',
+    code: sapItem.Material || '',
+    itemNumber: sapItem.PurchaseOrderItem || '',
+    description: sapItem.MaterialDescription || '',
+    recptQty: 0, 
+    targetQty: Math.floor(parseFloat(sapItem.OpenQuantity || 0)), 
+    uom: sapItem.EntryUnit || 'EA',
+    vendorId: sapItem.CartonEAN || 'None', 
     flags: {
-      damages: !!rawItem.damages,
-      noBarcode: !!rawItem.noBarcode,
-      invalidBarcode: !!rawItem.invalidBarcode
+      damages: false,
+      noBarcode: false,
+      invalidBarcode: false
     }
   };
 }
 
-// Utility function to convert ISO dates (YYYY-MM-DD) into display dates (DD/MM/YYYY)
-function formatDate(isoDateString) {
+function formatSAPDate(isoDateString) {
   if (!isoDateString) return '';
   const parts = isoDateString.split('-');
   if (parts.length !== 3) return isoDateString;
@@ -52,64 +48,62 @@ function formatDate(isoDateString) {
 }
 
 /**
- * --- ABSTRACTED ENTITY SERVICES ---
- * Exposes a stable contract wrapper API directly to the front-end Vue views workspace.
+ * --- EXTRACTED ENTITY SERVICES ---
  */
 export const EntityService = {
 
   /**
-   * SERVICE 1: Fetches shipments by number and expands deep child line records.
-   * Maps backend data entities into consistent frontend array tracking models.
+   * SERVICE 1: Fetches purchase orders and deep expands nested line items.
    */
-  async getDeliveriesList(deliverySearchNumber) {
+  async getDeliveriesList(purchaseOrderNumber) {
     try {
-      console.log(`[ENTITY SERVICE] Querying deliveries list for search indicator token: ${deliverySearchNumber}`);
+      console.log(`[SAP ENTITY SERVICE] Fetching Purchase Order: ${purchaseOrderNumber}`);
       
-      // Call the precise custom OData function exposed by the CAP service
-      const endpoint = `/getDeliveriesByNumber(searchNumber='${encodeURIComponent(deliverySearchNumber)}')`;
+      const queryParams = `$filter=PurchaseOrder eq '${encodeURIComponent(purchaseOrderNumber)}'&$expand=_Items`;
+      const endpoint = `/PurchaseOrder?${queryParams}`;
+      
       const response = await odataFetch(endpoint, { method: 'GET' });
-      
-      // OData v4 array payloads wrap their response datasets inside a default root 'value' block
       const rawCollection = response.value || [];
-      return rawCollection.map(normalizeDeliveryHeader);
+      
+      return rawCollection.map(normalizeSAPHeader);
     } catch (error) {
-      console.error('[ENTITY SERVICE] Failed to execute getDeliveriesList:', error);
-      throw new Error(`Deliveries Lookup Failed: ${error.message}`);
+      console.error('[SAP ENTITY SERVICE] Purchase Order fetch failed:', error);
+      throw new Error(`SAP PO Lookup Failed: ${error.message}`);
     }
   },
 
   /**
-   * SERVICE 2: Dispatches verification cache segments downstream back into persistent storage.
-   * Format parameter values exactly to match what the backend custom controller action anticipates.
+   * SERVICE 2: Commits captured goods receipts via standard SAP OData batch updates.
    */
-  async submitGoodsReceiptTransaction(deliveryContainerId, frontEndItemsArray) {
+  async submitGoodsReceiptTransaction(purchaseOrderNumber, frontEndItemsArray) {
     try {
-      console.log(`[ENTITY SERVICE] Sending batch transactional update payload across container UUID: ${deliveryContainerId}`);
+      console.log(`[SAP ENTITY SERVICE] Committing goods receipt for PO: ${purchaseOrderNumber}`);
 
-      // Transform front-end item records back into the strict format expected by the backend OData Action context
-      const formattedItemsPayload = frontEndItemsArray.map(item => ({
-        itemId: item.id,
-        recptQty: parseInt(item.recptQty, 10) || 0,
-        damages: !!item.flags.damages,
-        noBarcode: !!item.flags.noBarcode,
-        invalidBarcode: !!item.flags.invalidBarcode
-      }));
+      for (const item of frontEndItemsArray) {
+        const poId = purchaseOrderNumber;
+        const itemId = item.itemNumber; 
+        
+        const endpoint = `/PurchaseOrderItem(PurchaseOrder='${poId}',PurchaseOrderItem='${itemId}')`;
+        
+        // FIXED: Added EntryUnit property alongside OpenQuantity to satisfy the SAP dependent property constraint
+        const patchPayload = {
+          OpenQuantity: Math.max(0, item.targetQty - item.recptQty),
+          EntryUnit: item.uom
+        };
 
-      const endpoint = '/submitGoodsReceipt';
-      const bodyPayload = {
-        deliveryId: deliveryContainerId,
-        items: formattedItemsPayload
-      };
+        console.log(`[SAP PATCH] Dispatching payload with unit context to ${endpoint}:`, patchPayload);
 
-      const response = await odataFetch(endpoint, {
-        method: 'POST',
-        body: JSON.stringify(bodyPayload)
-      });
+        await odataFetch(endpoint, {
+          method: 'PATCH', 
+          headers: { 'If-Match': '*' }, 
+          body: JSON.stringify(patchPayload)
+        });
+      }
 
-      return response.value || 'Transaction executed successfully.';
+      return 'Success: Purchase order quantities updated on SAP backend successfully.';
     } catch (error) {
-      console.error('[ENTITY SERVICE] Failed to post transaction package details:', error);
-      throw new Error(`Receipt Submission Failed: ${error.message}`);
+      console.error('[SAP ENTITY SERVICE] Batch post processing failure:', error);
+      throw new Error(`SAP Receipt Submission Failed: ${error.message}`);
     }
   }
 };

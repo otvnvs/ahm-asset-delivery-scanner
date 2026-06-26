@@ -1,7 +1,7 @@
 import { bootstrapSfcApp } from './util/sfcBootstrap.js';
 import style from './style.css' with { type: 'css' };
 import { registerServiceWorker } from './util/serviceWorker/serviceWorker.js';
-registerServiceWorker('/public/sw.js');
+//registerServiceWorker('/public/sw.js');
 //registerServiceWorker('/public/mock-sw.js');
 document.adoptedStyleSheets = [...document.adoptedStyleSheets, style];
 bootstrapSfcApp().then(({ createApp, Main, router }) => {
