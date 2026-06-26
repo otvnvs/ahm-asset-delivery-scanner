@@ -1,7 +1,7 @@
 <template>
   <div class="minimal-container">
     <router-view></router-view>
-    <RefreshButton />
+    <!--<RefreshButton />-->
   </div>
   <CustomDialog />
 </template>
@@ -9,7 +9,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
 
-import RefreshButton from './components/refreshbutton/RefreshButton.vue';
+//import RefreshButton from './components/refreshbutton/RefreshButton.vue';
 import CustomDialog from './components/dialog/CustomDialog.vue';
 import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { sendWorkerMessage, listenForWorkerMessages } from './util/serviceWorker/serviceWorker.js';
