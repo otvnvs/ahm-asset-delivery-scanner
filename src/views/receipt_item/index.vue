@@ -4,154 +4,206 @@
 
     <!-- Main Workspace Area -->
     <main class="app-content content-workspace">
+      <!-- Fallback Error View if no item matches the query code -->
+      <div v-if="!activeItem" class="empty-state-card">
+        <p class="empty-text">Target item code could not be loaded from cache.</p>
+        <router-link to="/po_items" class="return-link">Return to PO Items</router-link>
+      </div>
+
       <!-- Top Info Summary Card Details -->
-      <div class="summary-card">
-        <h2 class="product-title">Cap NE 970 Rifle NY Y, White/Green, OSFM</h2>
-        
-        <div class="meta-grid">
-          <div class="meta-label">Article: <span class="meta-val">8233324001</span></div>
-          <div class="meta-label text-right">Item: <span class="meta-val">2110</span></div>
-        </div>
-
-        <div class="status-counter" :class="{ 'has-qty': quantity > 0 }">
-          {{ quantity }} EA - captured
-        </div>
-
-        <div class="vendor-stamp">Vendor Arg. 60843778</div>
-      </div>
-
-      <!-- Quantity Stepper Calculator Row Controls -->
-      <div class="stepper-row">
-        <button class="step-btn" @click="adjustQty(-5)">&lt; 5</button>
-        <button class="step-btn" @click="adjustQty(-1)">-</button>
-        <button class="step-btn" @click="adjustQty(1)">+</button>
-        <button class="step-btn" @click="adjustQty(5)">5 &gt;</button>
-      </div>
-
-      <!-- Exception Flag Row Toggles -->
-      <div class="toggles-list">
-        
-        <!-- Condition 1: Damages Flag -->
-        <div class="toggle-row">
-          <span class="toggle-label">Damages</span>
-          <div class="binary-switch">
-            <button 
-              type="button" 
-              class="switch-btn segment-no" 
-              :class="{ active: !flags.damages }"
-              @click="flags.damages = false"
-            >NO</button>
-            <button 
-              type="button" 
-              class="switch-btn segment-yes" 
-              :class="{ active: flags.damages }"
-              @click="flags.damages = true"
-            >YES</button>
+      <div v-else class="summary-wrapper-stack">
+        <div class="summary-card">
+          <!-- Dynamically maps normalized descriptive text values directly from your store schema -->
+          <h2 class="product-title">{{ activeItem.description }}</h2>
+          
+          <div class="meta-grid">
+            <div class="meta-label">Article: <span class="meta-val">{{ activeItem.code }}</span></div>
+            <div class="meta-label text-right">Item: <span class="meta-val">{{ activeItem.itemNumber }}</span></div>
           </div>
-        </div>
 
-        <!-- Condition 2: No Barcode Flag -->
-        <div class="toggle-row">
-          <span class="toggle-label">No Barcode</span>
-          <div class="binary-switch">
-            <button 
-              type="button" 
-              class="switch-btn segment-no" 
-              :class="{ active: !flags.noBarcode }"
-              @click="flags.noBarcode = false"
-            >NO</button>
-            <button 
-              type="button" 
-              class="switch-btn segment-yes" 
-              :class="{ active: flags.noBarcode }"
-              @click="flags.noBarcode = true"
-            >YES</button>
+          <div class="status-counter" :class="{ 'has-qty': quantity > 0 }">
+            {{ quantity }} / {{ activeItem.targetQty }} {{ activeItem.uom }} - captured
           </div>
+
+          <div class="vendor-stamp">Vendor Arg. {{ activeItem.vendorId }}</div>
         </div>
 
-        <!-- Condition 3: Invalid Barcode Flag -->
-        <div class="toggle-row">
-          <span class="toggle-label">Invalid Barcode</span>
-          <div class="binary-switch">
-            <button 
-              type="button" 
-              class="switch-btn segment-no" 
-              :class="{ active: !flags.invalidBarcode }"
-              @click="flags.invalidBarcode = false"
-            >NO</button>
-            <button 
-              type="button" 
-              class="switch-btn segment-yes" 
-              :class="{ active: flags.invalidBarcode }"
-              @click="flags.invalidBarcode = true"
-            >YES</button>
+        <!-- Quantity Stepper Calculator Row Controls -->
+        <div class="stepper-row">
+          <button class="step-btn" @click="adjustQty(-5)">&lt; 5</button>
+          <button class="step-btn" @click="adjustQty(-1)">-</button>
+          <button class="step-btn" @click="adjustQty(1)">+</button>
+          <button class="step-btn" @click="adjustQty(5)">5 &gt;</button>
+        </div>
+
+        <!-- Exception Flag Row Toggles -->
+        <div class="toggles-list">
+          
+          <!-- Condition 1: Damages Flag -->
+          <div class="toggle-row">
+            <span class="toggle-label">Damages</span>
+            <div class="binary-switch">
+              <button 
+                type="button" 
+                class="switch-btn segment-no" 
+                :class="{ active: !flags.damages }"
+                @click="flags.damages = false"
+              >NO</button>
+              <button 
+                type="button" 
+                class="switch-btn segment-yes" 
+                :class="{ active: flags.damages }"
+                @click="flags.damages = true"
+              >YES</button>
+            </div>
           </div>
+
+          <!-- Condition 2: No Barcode Flag -->
+          <div class="toggle-row">
+            <span class="toggle-label">No Barcode</span>
+            <div class="binary-switch">
+              <button 
+                type="button" 
+                class="switch-btn segment-no" 
+                :class="{ active: !flags.noBarcode }"
+                @click="flags.noBarcode = false"
+              >NO</button>
+              <button 
+                type="button" 
+                class="switch-btn segment-yes" 
+                :class="{ active: flags.noBarcode }"
+                @click="flags.noBarcode = true"
+              >YES</button>
+            </div>
+          </div>
+
+          <!-- Condition 3: Invalid Barcode Flag -->
+          <div class="toggle-row">
+            <span class="toggle-label">Invalid Barcode</span>
+            <div class="binary-switch">
+              <button 
+                type="button" 
+                class="switch-btn segment-no" 
+                :class="{ active: !flags.invalidBarcode }"
+                @click="flags.invalidBarcode = false"
+              >NO</button>
+              <button 
+                type="button" 
+                class="switch-btn segment-yes" 
+                :class="{ active: flags.invalidBarcode }"
+                @click="flags.invalidBarcode = true"
+              >YES</button>
+            </div>
+          </div>
+
         </div>
 
-      </div>
+        <!-- Bottom Form Control Action Buttons Row -->
+        <div class="form-actions-row">
+          <!-- Clear / Reset Parameters Trigger -->
+          <button type="button" class="action-btn-clear" @click="handleClear">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Clear
+          </button>
 
-      <!-- Bottom Form Control Action Buttons Row -->
-      <div class="form-actions-row">
-        <!-- Clear / Reset Parameters Trigger -->
-        <button type="button" class="action-btn-clear" @click="handleClear">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none">
-            <line x1="18" y1="6" x2="6" y2="18"></line>
-            <line x1="6" y1="6" x2="18" y2="18"></line>
-          </svg>
-          Clear
-        </button>
-
-        <!-- Save / Persist Entry Data Trigger -->
-        <button type="button" class="action-btn-save" @click="handleSave">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
-            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-            <polyline points="7 3 7 8 15 8"></polyline>
-          </svg>
-          Save
-        </button>
+          <!-- Save / Persist Entry Data Trigger -->
+          <button type="button" class="action-btn-save" @click="handleSave">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 3 7 8 15 8"></polyline>
+            </svg>
+            Save
+          </button>
+        </div>
       </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
+import { store } from '../../util/store.js';
 
 const router = useRouter();
-const quantity = ref(0);
+const route = useRoute();
 
+// Capture targeted query parameter from route address links
+const targetArticleCode = ref(route.query.articleCode || '');
+
+const quantity = ref(0);
 const flags = ref({
   damages: false,
   noBarcode: false,
   invalidBarcode: false
 });
 
+/**
+ * Computed Reference Core:
+ * Looks up the correct array record envelope from store memory matching the article code query parameter
+ */
+const activeItem = computed(() => {
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return null;
+  
+  // Safely grab the first matched document frame from the lookup array container
+  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  if (!activeDoc || !activeDoc.items) return null;
+
+  return activeDoc.items.find(item => item.code === targetArticleCode.value) || null;
+});
+
+// Seed current captured values from persistent store cache memory onto form controls layout on load
+onMounted(() => {
+  if (activeItem.value) {
+    quantity.value = activeItem.value.recptQty || 0;
+    if (activeItem.value.flags) {
+      flags.value.damages = !!activeItem.value.flags.damages;
+      flags.value.noBarcode = !!activeItem.value.flags.noBarcode;
+      flags.value.invalidBarcode = !!activeItem.value.flags.invalidBarcode;
+    }
+  }
+});
+
 const adjustQty = (amount) => {
   quantity.value = Math.max(0, quantity.value + amount);
 };
 
-// Reset all values back to default state
 const handleClear = () => {
-  console.log("Resetting transaction state values...");
+  console.log("[FORM ACTION] Resetting input trackers to default states...");
   quantity.value = 0;
   flags.value.damages = false;
   flags.value.noBarcode = false;
   flags.value.invalidBarcode = false;
 };
 
-// Handle data persistence and route redirect
+// Directly writes edited parameters back down to your reactive localStorage cache layer reference
 const handleSave = () => {
-  console.log("Saving collected shipment parameters: ", {
-    qty: quantity.value,
-    exceptions: flags.value
-  });
-  // Navigate back to item summary list
+  if (!activeItem.value) return;
+
+  console.log(`[STORE WRITE] Committing quantities back onto product row cache target: ${activeItem.value.code}`);
+
+  // Mutates store properties inside memory; deep-watch auto-triggers localStorage disk backup serialization sequence
+  activeItem.value.recptQty = parseInt(quantity.value, 10) || 0;
+  activeItem.value.flags = {
+    damages: !!flags.value.damages,
+    noBarcode: !!flags.value.noBarcode,
+    invalidBarcode: !!flags.value.invalidBarcode
+  };
+
+  // Return user back to PO Items summary table checklist screen track cleanly
   router.push('/po_items');
 };
 </script>
+
+
+
+
 
 <style scoped>
 .receipt-item-view {

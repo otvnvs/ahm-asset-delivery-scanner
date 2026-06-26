@@ -16,7 +16,7 @@ export function registerServiceWorker(workerScriptPath) {
       
       console.log('[SW REGISTER] Initiating registration pipeline for target route: ' + targetPath);
       
-      navigator.serviceWorker.register(targetPath)
+      navigator.serviceWorker.register(targetPath/*, { scope: '/' }*/)
         .then(function(registration) {
           console.log('[SW REGISTER] ServiceWorker successfully registered with scope: ', registration.scope);
           

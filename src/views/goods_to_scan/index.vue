@@ -5,18 +5,31 @@
 
     <!-- Main Workspace Scroll Area -->
     <main class="app-content content-workspace">
-      <div class="deliveries-list">
+      <!-- Empty State Banner: Appears if no records exist in the store cache -->
+      <div v-if="!deliveriesList || deliveriesList.length === 0" class="empty-state-card">
+        <svg viewBox="0 0 24 24" width="36" height="36" stroke="var(--text-muted)" stroke-width="1.5" fill="none">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <p class="empty-text">No active deliveries loaded in cache memory.</p>
+        <router-link to="/register_delivery" class="return-link">Register a Delivery</router-link>
+      </div>
+
+      <!-- Active Content Loop Display Track -->
+      <div v-else class="deliveries-list">
         
-        <!-- Loopable Delivery Entry Card Module Component -->
+        <!-- Loopable Delivery Entry Card Component -->
         <div 
-          v-for="delivery in deliveries" 
+          v-for="delivery in deliveriesList" 
           :key="delivery.id" 
           class="delivery-card"
-          @click="selectDelivery(delivery.id)"
+          @click="selectDelivery(delivery)"
         >
           <!-- Left Layout Block: Icon Graphic and Shipment Metadata details -->
           <div class="card-left">
             <div class="package-icon-wrapper">
+              <!-- Inline high-contrast dynamic shipping container vector asset -->
               <svg viewBox="0 0 24 24" width="32" height="32" stroke="#d97706" stroke-width="1.5" fill="#f59e0b">
                 <path d="M12 2L2 7l10 5 10-5-10-5z" />
                 <path d="M2 17l10 5 10-5M2 12l10 5 10-5" fill="none" />
@@ -25,9 +38,10 @@
             </div>
             
             <div class="delivery-details">
-              <h2 class="delivery-number">{{ delivery.poNumber }}</h2>
+              <!-- Maps the sanitized, normalized data fields from the store cache -->
+              <h2 class="delivery-number">{{ delivery.deliveryNumber }}</h2>
               <div class="meta-row">SSCC: <span class="meta-value">{{ delivery.sscc }}</span></div>
-              <div class="meta-row">Delivery: <span class="meta-value">{{ delivery.deliveryRef }}</span></div>
+              <div class="meta-row">Delivery: <span class="meta-value">{{ delivery.deliveryReference }}</span></div>
               <div class="meta-row">
                 Pallet: <span class="meta-value">{{ delivery.pallets }}</span> 
                 Cartons: <span class="meta-value">{{ delivery.cartons }}</span>
@@ -35,10 +49,11 @@
             </div>
           </div>
 
-          <!-- Right Layout Block: Timestamp Metrics -->
+          <!-- Right Layout Block: Timestamp and Status Metrics -->
           <div class="card-right">
             <span class="status-label">Received:</span>
             <span class="date-stamp">{{ delivery.dateReceived }}</span>
+            <span class="status-badge" :class="delivery.status.toLowerCase()">{{ delivery.status }}</span>
           </div>
         </div>
 
@@ -48,27 +63,33 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
+import { store } from '../../util/store.js';
 
 const router = useRouter();
 
-const deliveries = ref([
-  {
-    id: 1,
-    poNumber: '4500176856',
-    sscc: 'N/A',
-    deliveryRef: 'None',
-    pallets: 0,
-    cartons: 0,
-    dateReceived: '26/06/2026'
-  }
-]);
+/**
+ * Single-Source-of-Truth Computed Property:
+ * Listens directly to your custom reactive store cache structure.
+ * Automatically handles safe data array normalization fallbacks.
+ */
+const deliveriesList = computed(() => {
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return [];
+  // Ensure we are working with an array structure format natively
+  return Array.isArray(cachedData) ? cachedData : [cachedData];
+});
 
-// Navigates directly to your exact /po_items path route
-const selectDelivery = (id) => {
-  console.log(`Selecting delivery item ID: ${id}, routing to /po_items`);
+/**
+ * Item selection event execution handler:
+ * Saves a sub-pointer or moves directly into the line items list tracking screen.
+ */
+const selectDelivery = (delivery) => {
+  console.log(`[NAVIGATE] Target Delivery Selected: ${delivery.deliveryNumber}. Loading line items array...`);
+  
+  // We can pass or preserve information using your designated route parameter target
   router.push('/po_items');
 };
 </script>
@@ -134,6 +155,7 @@ const selectDelivery = (id) => {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  text-align: left;
 }
 
 .delivery-number {
@@ -159,7 +181,7 @@ const selectDelivery = (id) => {
   flex-direction: column;
   align-items: flex-end;
   text-align: right;
-  gap: 0.15rem;
+  gap: 0.35rem;
   min-width: max-content;
 }
 
@@ -173,6 +195,55 @@ const selectDelivery = (id) => {
   font-weight: 500;
   color: var(--text-muted, #94a3b8);
   font-family: monospace;
+}
+
+/* Status badge presentation styling rules */
+.status-badge {
+  font-size: 0.7rem;
+  font-weight: bold;
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-family: monospace;
+}
+
+.status-badge.pend {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.status-badge.completed {
+  background-color: rgba(66, 184, 131, 0.15);
+  color: var(--accent-color);
+}
+
+/* Empty cache fallback view layout styling blocks */
+.empty-state-card {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 3rem 1.5rem;
+  margin: 2rem auto 0 auto;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.empty-text {
+  font-size: 0.95rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.return-link {
+  color: var(--accent-color);
+  font-size: 0.9rem;
+  font-weight: bold;
+  text-decoration: underline;
 }
 </style>
 

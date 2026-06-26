@@ -1,47 +1,67 @@
 <template>
   <div class="app-layout scanned-goods-view">
-    <!-- Reusable Top Navigation Bar Component -->
-    <MenuTop title="GOODS TO RECEIPT" />
+    <!--Reusable Top Navigation Bar Component-->
+    <MenuTop title="GOODS TO RECEIPT"/>
 
-    <!-- Main Workspace Scroll Track -->
+    <!--Main Workspace Scroll Track-->
     <main class="app-content content-workspace">
-      <div class="scanned-list">
-        
-        <!-- Loopable Scanned Goods Entry Card -->
+      <!--Empty State:Displayed when no captured goods exist in the active store cache-->
+      <div v-if="scannedItems.length === 0" class="empty-state-card">
+        <svg viewBox="0 0 24 24" width="36" height="36" stroke="var(--text-muted)" stroke-width="1.5" fill="none">
+          <circle cx="12" cy="12" r="10"></circle>
+          <polyline points="12 6 12 12 16 14"></polyline>
+        </svg>
+        <p class="empty-text">No scanned items with captured quantities found.</p>
+        <router-link to="/po_items" class="return-link">View PO Items List</router-link>
+      </div>
+
+      <div v-else class="scanned-list">
+        <!--Loopable Scanned Goods Entry Card-->
         <div 
           v-for="item in scannedItems" 
           :key="item.id" 
-          class="scanned-card"
-          @click="inspectItem(item.id)"
+          class="scanned-card" 
+          @click="inspectItem(item.code)"
         >
-          <!-- Left Layout Column: Status indicator check box -->
-          <div class="card-status-indicator">
-            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="3" fill="none">
+          <!--Left Layout Column:Status indicator check box-->
+          <div class="card-status-indicator" :class="{ 'has-exceptions': hasExceptions(item.flags) }">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="3" fill="none">
               <polyline points="20 6 9 17 4 12"></polyline>
             </svg>
           </div>
 
-          <!-- Middle Layout Column: Detailed Product Data Specifications -->
+          <!--Middle Layout Column:Detailed Product Data Specifications-->
           <div class="card-body-details">
-            <div class="item-article-code">{{ item.articleCode }}</div>
+            <div class="item-article-code">{{ item.code }}</div>
             <div class="item-description-text">{{ item.description }}</div>
-            <div class="item-sub-meta">PO Delivery: {{ item.poDelivery }}</div>
-            <div class="item-sub-meta">Bags: {{ item.bags }}</div>
+            <div class="item-sub-meta">PO Delivery: {{ activeDocNumber }}</div>
+            <div class="item-sub-meta font-exceptions" v-if="hasExceptions(item.flags)">
+              Flags: {{ compileExceptionString(item.flags) }}
+            </div>
           </div>
 
-          <!-- Right Layout Column: Bright Green Logged Quantities Metric Counter -->
+          <!--Right Layout Column:Bright Green Logged Quantities Metric Counter-->
           <div class="card-qty-metric">
             <span class="qty-label">Qty:</span>
-            <span class="qty-value">{{ item.qty }}</span>
+            <span class="qty-value">{{ item.recptQty }}</span>
           </div>
         </div>
-
       </div>
 
-      <!-- Bottom System Process Form Control Action Button Row -->
+      <!--Action feedback banners panel indicator-->
+      <div v-if="statusBanner" class="status-banner" :class="statusBanner.status">
+        {{ statusBanner.message }}
+      </div>
+
+      <!--Bottom System Process Form Control Action Button Row-->
       <div class="form-actions-row">
-        <!-- Delete All / Clear Queue Module Button Trigger -->
-        <button type="button" class="action-btn-delete" @click="handleDeleteAll">
+        <!--Delete All/Clear Queue Module Button Trigger-->
+        <button 
+          type="button" 
+          class="action-btn-delete" 
+          @click="handleDeleteAll" 
+          :disabled="isSubmitting || scannedItems.length === 0"
+        >
           <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
@@ -51,13 +71,19 @@
           Delete All
         </button>
 
-        <!-- Save Server / Post Transaction Sync Module Button Trigger -->
-        <button type="button" class="action-btn-save-server" @click="handleSaveServer">
-          <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+        <!--Save Server/Post Transaction Sync Module Button Trigger-->
+        <button 
+          type="button" 
+          class="action-btn-save-server" 
+          @click="handleSaveServer" 
+          :disabled="isSubmitting || scannedItems.length === 0"
+        >
+          <span v-if="isSubmitting" class="spinner-icon"></span>
+          <svg v-else viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
             <path d="M12 2v12M12 14l-4-4M12 14l4-4"></path>
             <path d="M2 17v3a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-3"></path>
           </svg>
-          Save Server
+          {{ isSubmitting ? 'Saving...' : 'Save Server' }}
         </button>
       </div>
     </main>
@@ -65,36 +91,94 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
+import { store, storeActions } from '../../util/store.js';
+import { EntityService } from '../../util/entities.js';
 
 const router = useRouter();
+const isSubmitting = ref(false);
+const statusBanner = ref(null);
 
-// Mock data structured identically to your layout snapshot interface parameters
-const scannedItems = ref([
-  {
-    id: 1,
-    articleCode: '8233324001',
-    description: 'Cap NE 970 Rifle NY Y, White/Green, OSFM',
-    poDelivery: '4500176856',
-    bags: 'DN NBN LN',
-    qty: 0
-  }
-]);
+const activeDeliveryDoc = computed(() => {
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return null;
+  return Array.isArray(cachedData) ? cachedData[0] : cachedData;
+});
 
-// Route jump trigger hook targeting your designated outbox parameter route
-const inspectItem = (id) => {
-  console.log(`Drilling into item sequence trace record parameter ID: ${id}, jumping to /outbox_item`);
-  router.push('/outbox_item');
+const activeDocNumber = computed(() => {
+  return activeDeliveryDoc.value ? activeDeliveryDoc.value.deliveryNumber : 'N/A';
+});
+
+const scannedItems = computed(() => {
+  if (!activeDeliveryDoc.value || !activeDeliveryDoc.value.items) return [];
+  return activeDeliveryDoc.value.items.filter(item => item.recptQty > 0);
+});
+
+const inspectItem = (code) => {
+  console.log(`[OUTBOX] Navigating to edit view for item article code: ${code}`);
+  router.push({ path: '/outbox_item', query: { articleCode: code } });
 };
 
 const handleDeleteAll = () => {
-  console.log("Triggered sweep deletion request across all local items cache queue.");
+  console.log("Triggered sweep deletion request. Purging delivery from cache.");
+  // Use your storeActions setup to empty out the cache item cleanly
+  storeActions.clearActiveDeliveryCache();
+  router.push('/register_delivery');
 };
 
-const handleSaveServer = () => {
-  console.log("Posting local verification cache arrays downstream to central storage database logs.");
+const handleSaveServer = async () => {
+  if (!activeDeliveryDoc.value) return;
+
+  isSubmitting.value = true;
+  statusBanner.value = null;
+
+  try {
+    console.log("Posting local verification cache arrays downstream via Entity Service...");
+    
+    // Dispatches the sanitized parameters safely to your Node.js CAP backend
+    await EntityService.submitGoodsReceiptTransaction(
+      activeDeliveryDoc.value.id, 
+      scannedItems.value
+    );
+
+    console.log("[SERVER SUCCESS] Server save confirmed. Purging delivery data from localstorage...");
+    
+    // Clears the cache node array value dynamically from localstorage
+    storeActions.clearActiveDeliveryCache();
+    
+    statusBanner.value = {
+      status: 'success',
+      message: 'Transaction saved to server! Cache cleared.'
+    };
+
+    setTimeout(() => {
+      router.push('/home');
+    }, 1000);
+
+  } catch (error) {
+    console.error("[SAVE FAILED] Transaction aborted:", error);
+    statusBanner.value = {
+      status: 'failed',
+      message: `Failed to save to server: ${error.message}`
+    };
+  } finally {
+    isSubmitting.value = false;
+  }
+};
+
+const hasExceptions = (flags) => {
+  if (!flags) return false;
+  return flags.damages || flags.noBarcode || flags.invalidBarcode;
+};
+
+const compileExceptionString = (flags) => {
+  const list = [];
+  if (flags.damages) list.push('Damaged');
+  if (flags.noBarcode) list.push('No Barcode');
+  if (flags.invalidBarcode) list.push('Invalid Barcode');
+  return list.join(', ');
 };
 </script>
 
@@ -107,7 +191,7 @@ const handleSaveServer = () => {
 }
 
 .content-workspace {
-  /* padding-top: 5.5rem !important; */
+  padding-top: 5.5rem !important;
   padding-left: 1rem;
   padding-right: 1rem;
   padding-bottom: 1.5rem;
@@ -120,7 +204,6 @@ const handleSaveServer = () => {
   align-items: center;
 }
 
-/* Master list items vertical loop track alignment */
 .scanned-list {
   width: 100%;
   max-width: 440px;
@@ -129,7 +212,6 @@ const handleSaveServer = () => {
   gap: 0.75rem;
 }
 
-/* Scanned Product Card Framework matching your architecture standard specifications */
 .scanned-card {
   background-color: var(--surface-color);
   border: 1px solid var(--border-color);
@@ -147,9 +229,8 @@ const handleSaveServer = () => {
   transform: scale(0.99);
 }
 
-/* Left layout check symbol block */
 .card-status-indicator {
-  background-color: #00e676; /* Bright brand accent layout verification green tracking token */
+  background-color: #00e676; 
   color: #121214;
   width: 28px;
   height: 28px;
@@ -161,7 +242,10 @@ const handleSaveServer = () => {
   margin-top: 0.15rem;
 }
 
-/* Central informational string text block configurations */
+.card-status-indicator.has-exceptions {
+  background-color: #f59e0b;
+}
+
 .card-body-details {
   flex: 1;
   display: flex;
@@ -189,7 +273,11 @@ const handleSaveServer = () => {
   font-family: monospace;
 }
 
-/* Right layout bright emerald status parameter counters tracking style */
+.font-exceptions {
+  color: #f87171;
+  font-weight: 500;
+}
+
 .card-qty-metric {
   display: flex;
   flex-direction: column;
@@ -211,18 +299,39 @@ const handleSaveServer = () => {
   color: #00e676;
 }
 
-/* Bottom Footer Action Controls Container Layout system */
+.status-banner {
+  width: 100%;
+  max-width: 440px;
+  padding: 0.85rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: center;
+  line-height: 1.4;
+  box-sizing: border-box;
+}
+
+.status-banner.success {
+  background-color: rgba(66, 184, 131, 0.1);
+  border: 1px solid rgba(66, 184, 131, 0.3);
+  color: var(--accent-color);
+}
+
+.status-banner.failed {
+  background-color: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
 .form-actions-row {
   width: 100%;
   max-width: 440px;
   display: grid;
-  grid-template-columns: 1fr 1.15fr; /* Controls structural asymmetric width distribution */
+  grid-template-columns: 1fr 1.15fr;
   gap: 0.75rem;
-  /*margin-top: auto;*/ /* Locks down items row comfortably to bottom of inner layout height tracking bounds */
+  margin-top: auto;
   padding-top: 1rem;
 }
 
-/* Red Tinted Destruction Action Button component */
 .action-btn-delete {
   background-color: transparent;
   border: 1px solid rgba(239, 68, 68, 0.25);
@@ -238,11 +347,10 @@ const handleSaveServer = () => {
   cursor: pointer;
 }
 
-.action-btn-delete:active {
+.action-btn-delete:not(:disabled):active {
   background-color: rgba(239, 68, 68, 0.1);
 }
 
-/* Neon Green Remote Push Execution Confirmation Action Button component */
 .action-btn-save-server {
   background-color: #00e676;
   color: #121214;
@@ -251,16 +359,4 @@ const handleSaveServer = () => {
   padding: 0.85rem 0;
   font-size: 0.95rem;
   font-weight: bold;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.15);
-}
-
-.action-btn-save-server:active {
-  opacity: 0.9;
-}
-</style>
-
+display: flex;align-items: center;justify-content: center;gap: 0.4rem;cursor: pointer;box-shadow: 0 4px 12px rgba(0, 230, 118, 0.15);}.action-btn-save-server:not(:disabled):active {opacity: 0.9;}.action-btn-delete:disabled,.action-btn-save-server:disabled {opacity: 0.4;cursor: not-allowed;}.spinner-icon {width: 14px;height: 14px;border: 2px solid #121214;border-top-color: transparent;border-radius: 50%;animation: spin 0.8s linear infinite;display: inline-block;}@keyframes spin {to { transform: rotate(360deg); }}.empty-state-card {width: 100%;max-width: 440px;background-color: var(--surface-color);border: 1px solid var(--border-color);border-radius: 8px;padding: 3rem 1.5rem;box-sizing: border-box;display: flex;flex-direction: column;align-items: center;gap: 1rem;}.empty-text {font-size: 0.95rem;color: var(--text-muted);margin: 0;}.return-link {color: var(--accent-color);font-size: 0.9rem;font-weight: bold;text-decoration: underline;}</style>

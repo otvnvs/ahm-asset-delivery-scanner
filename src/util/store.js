@@ -9,10 +9,11 @@ const defaultState = {
   },
   appPin: null,
   config: {
-    odataUrl: '',
+    odataUrl: 'http://localhost:4004/odata/v4/catalog',
     username: '',
     password: '',
-    networkTimeoutMs: 5000
+    networkTimeoutMs: 5000,
+    useDummyData: false 
   },
   // NEW: Offline Caching Schema Core
   cache: {
@@ -94,11 +95,12 @@ export const storeActions = {
   logout() {
     store.user.isLoggedIn = false;
   },
-  saveODataConfig(url, user, pass, timeoutMs) {
+  saveODataConfig(url, user, pass, timeoutMs, useDummyData = false) {
     store.config.odataUrl = url;
     store.config.username = user;
     store.config.password = pass;
     store.config.networkTimeoutMs = parseInt(timeoutMs, 10) || 5000;
+    store.config.useDummyData = !!useDummyData; // Commits toggle choice
     console.log('[STORE ACTION] OData settings updated successfully.');
   },
   // NEW ACTIONS: Cache setters and simulator controls
@@ -127,6 +129,10 @@ export const storeActions = {
     
     // 2. Remove the persistent string cache block from disk space completely
     localStorage.removeItem(STORAGE_KEY);
+  },
+  clearActiveDeliveryCache() {
+    store.cache.entityLists['ActiveDelivery'] = null;
+    console.log('[STORE ACTION] Active delivery cache data wiped from memory and localstorage.');
   }
 };
 

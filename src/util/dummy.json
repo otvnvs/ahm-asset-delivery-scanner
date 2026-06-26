@@ -1,0 +1,46 @@
+{
+  "value": [
+    {
+      "ID": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+      "deliveryNumber": "4500176856",
+      "storageLocation_id": "0001",
+      "sscc": "N/A",
+      "deliveryReference": "None",
+      "pallets": 0,
+      "cartons": 0,
+      "dateReceived": "2026-06-26",
+      "status": "PEND",
+      "items": [
+        {
+          "ID": "f1e2d3c4-b5a6-9z8y-7x6w-5v4u3t2r1q0p",
+          "delivery_ID": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+          "articleCode": "8233324001",
+          "itemNumber": "2110",
+          "description": "Cap NE 970 Rifle NY Y, White/Green, OSFM",
+          "recptQty": 0,
+          "targetQty": 10,
+          "uom": "EA",
+          "vendorId": "60843778",
+          "damages": false,
+          "noBarcode": false,
+          "invalidBarcode": false
+        },
+        {
+          "ID": "e2d3c4b5-a69z-8y7x-6w5v-4u3t2r1q0p1a",
+          "delivery_ID": "a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d",
+          "articleCode": "8233325001",
+          "itemNumber": "2120",
+          "description": "Cap NE 970 Rifle Chic, White/Green, OSFM",
+          "recptQty": 0,
+          "targetQty": 5,
+          "uom": "EA",
+          "vendorId": "60843782",
+          "damages": false,
+          "noBarcode": false,
+          "invalidBarcode": false
+        }
+      ]
+    }
+  ]
+}
+

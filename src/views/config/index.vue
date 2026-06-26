@@ -55,6 +55,18 @@
           </div>
         </div>
 
+        <!-- Field 5: Development Mock Data Toggle -->
+        <div class="form-group toggle-field-row">
+          <label class="form-label check-label">
+            <input 
+              type="checkbox" 
+              v-model="localConfig.useDummyData" 
+              class="form-checkbox"
+            />
+            Activate Offline Development Mode (Use Dummy Data)
+          </label>
+        </div>
+
         <!-- Connection Diagnostics Feedback Banner Panel -->
         <div v-if="testResult" class="status-banner" :class="testResult.status">
           {{ testResult.message }}
@@ -90,6 +102,7 @@ import { useRouter } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
 import { store, storeActions } from '../../util/store.js';
 import { testODataConnection } from '../../util/odata.js';
+import { syncServiceWorkerState } from '../../util/sw.js'; 
 
 const router = useRouter();
 const saveSuccess = ref(false);
@@ -100,7 +113,8 @@ const localConfig = ref({
   odataUrl: store.config.odataUrl,
   username: store.config.username,
   password: store.config.password,
-  networkTimeoutMs: store.config.networkTimeoutMs
+  networkTimeoutMs: store.config.networkTimeoutMs,
+  useDummyData: store.config.useDummyData // Read flag from store
 });
 
 // Run live diagnostic connection test profile
@@ -125,17 +139,19 @@ const runDiagnostics = async () => {
     isTesting.value = false;
   }
 };
-
 const handleSaveConfig = () => {
   storeActions.saveODataConfig(
     localConfig.value.odataUrl,
     localConfig.value.username,
     localConfig.value.password,
-    localConfig.value.networkTimeoutMs
+    localConfig.value.networkTimeoutMs,
+    localConfig.value.useDummyData
   );
   
-  saveSuccess.value = true;
+  // Synchronizes proxy interception layer instantly upon configuration save
+  syncServiceWorkerState();
 
+  saveSuccess.value = true;
   setTimeout(() => {
     saveSuccess.value = false;
     router.push('/home');

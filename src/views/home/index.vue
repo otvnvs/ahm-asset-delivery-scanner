@@ -1,13 +1,13 @@
 <template>
   <div class="app-layout home-view">
-    <!-- Topbar locked at the absolute top of the viewport -->
+    <!--Topbar locked at the absolute top of the viewport-->
     <MenuTop title="Home" />
 
-    <!-- Main Workspace with dynamic viewport-height constraints to eliminate scroll -->
+    <!--Main Workspace with dynamic viewport-height constraints to eliminate scroll-->
     <main class="app-content content-workspace">
       <div class="dashboard-grid">
         
-        <!-- Tile 1: Register Delivery -->
+        <!--Tile 1:Register Delivery-->
         <router-link to="/register_delivery" class="tile-card">
           <div class="tile-icon-container">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
@@ -20,27 +20,27 @@
           <div class="tile-label">Register Delivery</div>
         </router-link>
 
-        <!-- Tile 2: Goods to Scan -->
+        <!--Tile 2:Goods to Scan-->
         <router-link to="/goods_to_scan" class="tile-card">
           <div class="tile-meta">
             <div class="tile-icon-container">
-		<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round">
-		  <!-- Barcode Vertical Slats (Varied Widths and Offsets) -->
-		  <path d="M3 6h1v12H3zm3 0h2v12H6zm4 0h1v12h-1zm3 0h3v12h-3zm5 0h1v12h-1zm3 0h1v12h-1z" fill="currentColor" stroke="none" />
-		  
-		  <!-- Laser Target Line Overlay -->
-		  <line x1="1" y1="12" x2="23" y2="12" stroke="var(--accent-color)" stroke-width="1.5" />
-		</svg>
+              <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round">
+                <!--Barcode Vertical Slats(Varied Widths and Offsets)-->
+                <path d="M3 6h1v12H3zm3 0h2v12H6zm4 0h1v12h-1zm3 0h3v12h-3zm5 0h1v12h-1zm3 0h1v12h-1z" fill="currentColor" stroke="none"/>
+                <!--Laser Target Line Overlay-->
+                <line x1="1" y1="12" x2="23" y2="12" stroke="var(--accent-color)" stroke-width="1.5"/>
+              </svg>
             </div>
+            <!-- Computes unreceived warehouse product rows remaining -->
             <div class="badge-count-wrapper">
-              <span class="badge-number">1</span>
+              <span class="badge-number">{{ pendingScanCount }}</span>
               <span class="badge-text">PEND.</span>
             </div>
           </div>
           <div class="tile-label">Goods to Scan</div>
         </router-link>
 
-        <!-- Tile 3: Scanned Goods -->
+        <!--Tile 3:Scanned Goods-->
         <router-link to="/scanned_goods" class="tile-card">
           <div class="tile-meta">
             <div class="tile-icon-container">
@@ -51,26 +51,27 @@
                 <line x1="9" y1="17" x2="15" y2="17"></line>
               </svg>
             </div>
+            <!-- Computes local active queue counts ready to submit to server -->
             <div class="badge-count-wrapper">
-              <span class="badge-number">1</span>
+              <span class="badge-number">{{ capturedGoodsCount }}</span>
               <span class="badge-text">PEND.</span>
             </div>
           </div>
           <div class="tile-label">Scanned Goods 1</div>
         </router-link>
 
-        <!-- Tile 4: System Server Engine Settings Profile Configuration -->
+        <!--Tile 4:System Server Engine Settings Profile Configuration-->
         <router-link to="/config" class="tile-card">
           <div class="tile-icon-container">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="3"></circle>
-              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+              <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1-2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
             </svg>
           </div>
           <div class="tile-label">Configuration</div>
         </router-link>
 
-        <!-- Tile 5: About Screen Link -->
+        <!--Tile 5:About Screen Link-->
         <router-link to="/about" class="tile-card">
           <div class="tile-icon-container">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
@@ -82,7 +83,7 @@
           <div class="tile-label">About</div>
         </router-link>
 
-        <!-- Tile 6: Lock Application System Hook -->
+        <!--Tile 6:Lock Application System Hook-->
         <div class="tile-card interactive-action lock-tile" @click="handleLock">
           <div class="tile-icon-container">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
@@ -93,16 +94,15 @@
           <div class="tile-label">Lock</div>
         </div>
 
-
-
       </div>
     </main>
   </div>
 </template>
 
 <script setup>
+import { computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { storeActions } from '../../util/store.js';
+import { store, storeActions } from '../../util/store.js';
 import MenuTop from '../../components/menutop/index.vue';
 
 const router = useRouter();
@@ -111,26 +111,51 @@ const handleLock = () => {
   storeActions.logout();
   router.push('/enter');
 };
+
+/**
+ * Accesses active item sets currently loaded within cache memory modules
+ */
+const activeItems = computed(() => {
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return [];
+  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  return activeDoc && activeDoc.items ? activeDoc.items : [];
+});
+
+/**
+ * COUNTER 1: Goods to Scan
+ * Returns the count of unique articles that have not been captured yet (recptQty === 0)
+ */
+const pendingScanCount = computed(() => {
+  if (activeItems.value.length === 0) return 0;
+  return activeItems.value.filter(item => item.recptQty === 0).length;
+});
+
+/**
+ * COUNTER 2: Scanned Goods
+ * Returns the count of items that currently have captured quantities ready to go to the server (recptQty > 0)
+ */
+const capturedGoodsCount = computed(() => {
+  if (activeItems.value.length === 0) return 0;
+  return activeItems.value.filter(item => item.recptQty > 0).length;
+});
 </script>
 
 <style scoped>
-/* Master Container Layout */
 .app-layout {
   display: flex;
   flex-direction: column;
-  /* Use dvh (Dynamic Viewport Height) to account for mobile URL browser toolbars */
-  height: 100dvh; 
-  overflow: hidden; /* Hard restriction to kill accidental screen scrolling */
+  height: 100dvh;
+  overflow: hidden;
   box-sizing: border-box;
 }
 
-/* Topbar Layout Locking */
 .fixed-topbar {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
-  height: 56px; /* Set rigid explicit header boundary height */
+  height: 56px;
   z-index: 100;
   box-sizing: border-box;
   background-color: var(--surface-color);
@@ -148,35 +173,22 @@ const handleLock = () => {
   color: var(--text-main);
 }
 
-/* Screen container offset adjustment and flex alignment */
-.content-workspace {
-/*
-  flex: 1;
-  margin-top: 56px;
-  padding: 1rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-sizing: border-box;
-*/
-}
+.content-workspace {}
 
-/* Fluid, defensive grid structure layout */
 .dashboard-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 0.75rem; /* Tighter padding margins on small physical hardware */
+  gap: 0.75rem;
   width: 100%;
   box-sizing: border-box;
 }
 
-/* Optimized Mobile Tile Card */
 .tile-card {
   background-color: var(--surface-color);
   border: 1px solid var(--border-color);
   border-radius: 6px;
-  padding: 1rem; /* Compact card margins */
-  aspect-ratio: 1 / 1; 
+  padding: 1rem;
+  aspect-ratio: 1 / 1;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -189,7 +201,6 @@ const handleLock = () => {
   cursor: pointer;
 }
 
-/* Metadata formatting items */
 .tile-meta {
   display: flex;
   justify-content: space-between;
@@ -202,7 +213,7 @@ const handleLock = () => {
 }
 
 .tile-label {
-  font-size: 0.85rem; /* Downscaled layout texts to survive layout clipping */
+  font-size: 0.85rem;
   line-height: 1.2;
   color: var(--text-main);
 }

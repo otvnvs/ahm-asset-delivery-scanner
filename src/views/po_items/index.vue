@@ -14,12 +14,17 @@
         />
       </div>
 
-      <!-- Scrollable list of items -->
-      <div class="items-list">
+      <!-- Empty State Fallback View -->
+      <div v-if="!itemsList || itemsList.length === 0" class="empty-state-card">
+        <p class="empty-text">No items found for this delivery.</p>
+      </div>
+
+      <!-- Scrollable list of items mapped from cache memory -->
+      <div v-else class="items-list">
         <div 
           v-for="item in filteredItems" 
           :key="item.id" 
-          class="item-card"
+          class="item-card interactive-card"
           @click="selectItem(item)"
         >
           <!-- Item Code highlighted in green accent color -->
@@ -28,11 +33,11 @@
           <!-- Detailed Item description text metadata block -->
           <div class="item-description">{{ item.description }}</div>
           
-          <!-- Core tracking metrics information row line summary -->
+          <!-- Core tracking metrics dynamically reading from your live normalized schema values -->
           <div class="item-meta">
-            Recpt. Qty: <span class="highlight">{{ item.recptQty }}</span> 
-            / <span class="highlight">{{ item.cartons }} CAR</span> 
-            - Vendor Arg. <span class="highlight">{{ item.vendorId }}</span>
+            Recpt. Qty: <span class="highlight">{{ item.recptQty }} / {{ item.targetQty }} {{ item.uom }}</span> 
+            <span v-if="hasActiveExceptions(item.flags)" class="exception-alert-tag">- EXCEPTION</span>
+            <span class="vendor-label"> - Vendor Arg. <span class="highlight">{{ item.vendorId }}</span></span>
           </div>
         </div>
       </div>
@@ -44,67 +49,49 @@
 import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
-const router = useRouter();
+import { store } from '../../util/store.js';
 
+const router = useRouter();
 const searchQuery = ref('');
 
-// Item data array mimicking your live layout screenshot variables exactly
-const items = ref([
-  {
-    id: 1,
-    code: '8233324001',
-    description: 'Cap NE 970 Rifle NY Y, White/Green, OSFM',
-    recptQty: '0EQ',
-    cartons: '0',
-    vendorId: '60843778'
-  },
-  {
-    id: 2,
-    code: '8233325001',
-    description: 'Cap NE 970 Rifle Chic, White/Green, OSFM',
-    recptQty: '0EQ',
-    cartons: '0',
-    vendorId: '60843782'
-  },
-  {
-    id: 3,
-    code: '8233326001',
-    description: 'Cap NE 970 Rifle Chic, White/Green, OSFM',
-    recptQty: '0EQ',
-    cartons: '0',
-    vendorId: '60843780'
-  },
-  {
-    id: 4,
-    code: '8233327001',
-    description: 'Cap NE 940 Washed NY Yanke, Pebble, OSFM',
-    recptQty: '0EQ',
-    cartons: '0',
-    vendorId: '60843728'
-  },
-  {
-    id: 5,
-    code: '8233328001',
-    description: 'Cap NE 940 Washed LA Dodge, Pebble, OSFM',
-    recptQty: '0EQ',
-    cartons: '0',
-    vendorId: '60843724'
-  }
-]);
+/**
+ * Computed State Pull:
+ * Extracts the single loaded delivery envelope from the array container
+ * and isolates the normalized items collection nested inside it.
+ */
+const itemsList = computed(() => {
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return [];
+  
+  // Safely grab the first matched document frame from the lookups cache
+  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  return activeDoc && activeDoc.items ? activeDoc.items : [];
+});
 
-// Real-time reactive searching/filtering utility hook computation logic
+// Real-time reactive searching/filtering logic bound to your cache data
 const filteredItems = computed(() => {
-  if (!searchQuery.value) return items.value;
+  if (!searchQuery.value) return itemsList.value;
   const query = searchQuery.value.toLowerCase();
-  return items.value.filter(item => 
-    item.code.toLowerCase().includes(query) || 
-    item.description.toLowerCase().includes(query)
+  return itemsList.value.filter(item => 
+    (item.code && item.code.toLowerCase().includes(query)) || 
+    (item.description && item.description.toLowerCase().includes(query))
   );
 });
 
+// Helper check flag to render subtle indicators if flags were toggled on before
+const hasActiveExceptions = (flags) => {
+  if (!flags) return false;
+  return flags.damages || flags.noBarcode || flags.invalidBarcode;
+};
+
 const selectItem = (item) => {
-  console.log(`Selecting product barcode: ${item.code}`);
-  router.push('/receipt_item');
+  console.log(`[NAVIGATE] Target Product Selected: ${item.code}. Forwarding to receipt screen.`);
+  
+  // Cache a simple pointer parameter or pass queries over to the item capture route
+  router.push({
+    path: '/receipt_item',
+    query: { articleCode: item.code }
+  });
 };
 </script>
 
@@ -177,6 +164,16 @@ const selectItem = (item) => {
   text-align: left;
 }
 
+.interactive-card {
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.interactive-card:active {
+  transform: scale(0.99);
+  background-color: var(--border-color);
+}
+
 /* Identification title metrics mapping green tokens */
 .item-code {
   font-size: 1.05rem;
@@ -202,6 +199,21 @@ const selectItem = (item) => {
 
 .highlight {
   color: var(--text-main);
+}
+
+.exception-alert-tag {
+  color: #ef4444;
+  font-weight: bold;
+}
+
+.vendor-label {
+  display: inline-block;
+}
+
+.empty-state-card {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-muted);
 }
 </style>
 
