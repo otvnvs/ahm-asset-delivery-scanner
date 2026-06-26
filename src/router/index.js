@@ -10,6 +10,7 @@ import ScannedGoods from '../views/scanned_goods/index.vue';
 import POItems from '../views/po_items/index.vue';
 import ReceiptItem from '../views/receipt_item/index.vue';
 import OutboxItem from '../views/outbox_item/index.vue';
+import Config from '../views/config/index.vue';
 
 const routes = [
   { path: '/', redirect: '/home' },
@@ -23,6 +24,7 @@ const routes = [
   { name: 'po_items', path: '/po_items', component:POItems},
   { name: 'receipt_item', path: '/receipt_item', component:ReceiptItem},
   { name: 'outbox_item', path: '/outbox_item', component:OutboxItem},
+  { name: 'config', path: '/config', component:Config},
   { path: '/:catchAll(.*)*', redirect: '/home' }
 ];
 
