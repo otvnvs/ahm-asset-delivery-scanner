@@ -83,6 +83,7 @@ while true; do
             $ADB shell am broadcast -a "$APP_PACKAGE.ACTION_RELOAD_WEBVIEW" > /dev/null
             echo -e "${CLR_SUCCESS}-> Push Complete!${CLR_RESET}"
             echo -e "\a"
+	    beep
         fi
     done < <(find_valid_files)
 

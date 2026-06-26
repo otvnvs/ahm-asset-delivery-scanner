@@ -1,22 +1,14 @@
 <template>
   <div class="app-layout home-view">
     <!-- Topbar locked at the absolute top of the viewport -->
-    <header class="app-header fixed-topbar">
-      <h1 class="header-title">Goods Receipting</h1>
-      <router-link to="/" class="header-home-btn">
-        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
-          <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-          <polyline points="9 22 9 12 15 12 15 22"></polyline>
-        </svg>
-      </router-link>
-    </header>
+    <MenuTop title="Home" />
 
     <!-- Main Workspace with dynamic viewport-height constraints to eliminate scroll -->
     <main class="app-content content-workspace">
       <div class="dashboard-grid">
         
         <!-- Tile 1: Register Delivery -->
-        <router-link to="/services" class="tile-card">
+        <router-link to="/register_delivery" class="tile-card">
           <div class="tile-icon-container">
             <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
@@ -29,16 +21,16 @@
         </router-link>
 
         <!-- Tile 2: Goods to Scan -->
-        <router-link to="/services" class="tile-card">
+        <router-link to="/goods_to_scan" class="tile-card">
           <div class="tile-meta">
             <div class="tile-icon-container">
-<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round">
-  <!-- Barcode Vertical Slats (Varied Widths and Offsets) -->
-  <path d="M3 6h1v12H3zm3 0h2v12H6zm4 0h1v12h-1zm3 0h3v12h-3zm5 0h1v12h-1zm3 0h1v12h-1z" fill="currentColor" stroke="none" />
-  
-  <!-- Laser Target Line Overlay -->
-  <line x1="1" y1="12" x2="23" y2="12" stroke="var(--accent-color)" stroke-width="1.5" />
-</svg>
+		<svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round">
+		  <!-- Barcode Vertical Slats (Varied Widths and Offsets) -->
+		  <path d="M3 6h1v12H3zm3 0h2v12H6zm4 0h1v12h-1zm3 0h3v12h-3zm5 0h1v12h-1zm3 0h1v12h-1z" fill="currentColor" stroke="none" />
+		  
+		  <!-- Laser Target Line Overlay -->
+		  <line x1="1" y1="12" x2="23" y2="12" stroke="var(--accent-color)" stroke-width="1.5" />
+		</svg>
             </div>
             <div class="badge-count-wrapper">
               <span class="badge-number">1</span>
@@ -49,7 +41,7 @@
         </router-link>
 
         <!-- Tile 3: Scanned Goods -->
-        <router-link to="/services" class="tile-card">
+        <router-link to="/scanned_goods" class="tile-card">
           <div class="tile-meta">
             <div class="tile-icon-container">
               <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
@@ -67,15 +59,16 @@
           <div class="tile-label">Scanned Goods 1</div>
         </router-link>
 
-        <!-- Tile 4: Dashboard Home View -->
-        <router-link to="/services" class="tile-card">
+        <!-- Tile 4: About Screen Link -->
+        <router-link to="/about" class="tile-card">
           <div class="tile-icon-container">
-            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-              <polyline points="9 22 9 12 15 12 15 22"></polyline>
+            <svg viewBox="0 0 24 24" width="24" height="24" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
           </div>
-          <div class="tile-label">Home</div>
+          <div class="tile-label">About</div>
         </router-link>
 
         <!-- Tile 5: Lock Application System Hook -->
@@ -89,6 +82,8 @@
           <div class="tile-label">Lock</div>
         </div>
 
+
+
       </div>
     </main>
   </div>
@@ -97,6 +92,7 @@
 <script setup>
 import { useRouter } from 'vue-router';
 import { storeActions } from '../../util/store.js';
+import MenuTop from '../../components/menutop/index.vue';
 
 const router = useRouter();
 

@@ -1,4 +1,5 @@
 <template>
+  <MenuTop title="About" />
   <div class="view-wrapper home-view">
     <div class="view-header">About View</div>
     <p class="welcome-text">About application.</p>
@@ -8,6 +9,7 @@
 
 <script setup>
 import { useRouter } from 'vue-router';
+import MenuTop from '../../components/menutop/index.vue';
 
 const router = useRouter();
 
