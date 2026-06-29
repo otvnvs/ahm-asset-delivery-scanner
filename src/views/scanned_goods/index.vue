@@ -135,6 +135,8 @@ const handleSaveServer = async () => {
   statusBanner.value = null;
 
   try {
+	window.activeDeliveryDoc=activeDeliveryDoc//sq
+	window.scannedItems=scannedItems.value//sq
     console.log("Posting local verification cache arrays downstream via Entity Service...");
     
     // Dispatches the sanitized parameters safely to your Node.js CAP backend
