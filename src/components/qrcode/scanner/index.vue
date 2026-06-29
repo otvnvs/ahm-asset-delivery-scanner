@@ -1,111 +1,138 @@
 <template>
-  <div class="scanner-fullscreen-shell">
-    <!-- Header Controls Navigation Bar -->
-    <header class="bar-header">
-      <button type="button" @click="emitClose" class="nav-btn">← Back</button>
-      <span class="bar-title">Live QR Scanner View</span>
-      <div class="spacer-block"></div>
+  <div class="scanner-page">
+    <header class="scanner-header">
+      <button type="button" @click="handleCancel" class="back-btn">← Back</button>
+      <h2>Camera Scanner</h2>
     </header>
 
-    <!-- Main Live View Tracking Screen Frame -->
-    <main class="view-viewport">
-      <!-- Native HTML5 Video Element for live feed -->
-      <video 
-        ref="videoRef" 
-        autoplay 
-        playsinline 
-        muted 
-        class="webcam-stream"
-      ></video>
-
-      <!-- Targeted Capture Box Frame Overlay -->
-      <div class="capture-target-box">
-        <div class="target-corners"></div>
-        <span class="laser-indicator"></span>
+    <main class="scanner-body">
+      <!-- The critical DOM mount point for the html5-qrcode engine -->
+      <div id="qr-code-region"></div>
+      
+      <!-- Status message tracking layout -->
+      <div v-if="feedbackMessage" class="feedback-banner" :class="feedbackStatus">
+        {{ feedbackMessage }}
       </div>
-
-      <!-- Live Error Feedback Banner if permissions are denied -->
-      <div v-if="cameraError" class="error-banner">
-        {{ cameraError }}
-      </div>
-
-      <p class="guide-text">Position the QR code inside the target window.</p>
     </main>
-
-    <!-- Bottom Actions Control Hub -->
-    <footer class="bar-footer">
-      <button type="button" @click="emitFakeScan" class="mock-action-btn">
-        Trigger Mock Scan Result
-      </button>
-    </footer>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted, onBeforeUnmount } from 'vue';
+import Html5QrCode from '../../../lib/html5-qrcode/html5-qrcode.min.js';
 
+// Define the component communication events
 const emit = defineEmits(['close', 'scanned']);
 
-const videoRef = ref(null);
-const cameraError = ref('');
-let localStream = null;
+const feedbackMessage = ref('Initializing camera matrix...');
+const feedbackStatus = ref('');
+let scannerInstance = null;
 
 onMounted(() => {
-  startWebcam();
+  // 1. Initialize the engine targeting our div ID
+  // Depending on your wrapper method, check if you need: new Html5QrCode.Html5Qrcode(...)
+  scannerInstance = new Html5QrCode.Html5Qrcode("qr-code-region");
+  
+  startCameraStream();
 });
 
 onBeforeUnmount(() => {
-  stopWebcam();
+  // 2. Crucial: Release hardware locks cleanly if user changes pages/tabs
+  stopCameraStream();
 });
 
-const startWebcam = async () => {
+const startCameraStream = async () => {
   try {
-    // Request access specifically to the rear hardware camera on mobile devices
-    const constraints = {
-      video: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 }
-      },
-      audio: false // Audio track disabled
+    const config = { 
+      fps: 10, 
+      qrbox: { width: 250, height: 250 } 
     };
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    localStream = stream;
+    // 3. Start hardware video capture tracking
+    await scannerInstance.start(
+      { facingMode: "environment" }, // Forces mobile rear camera layout
+      config,
+      onQrCodeDetected,
+      onScanTickFailure
+    );
+    
+    feedbackMessage.value = 'Align the server QR code inside the bounding box.';
+    feedbackStatus.value = '';
+  } catch (err) {
+    feedbackMessage.value = `Camera Activation Failed: ${err}`;
+    feedbackStatus.value = 'error';
+    console.error(err);
+  }
+};
 
-    // Bind the active video hardware stream directly to our HTML5 element
-    if (videoRef.value) {
-      videoRef.value.srcObject = stream;
+//const onQrCodeDetected = async (decodedText) => {
+//  try {
+//    // 4. Kill the active camera stream instantly to stop duplicate scan events
+//    await stopCameraStream();
+//
+//    // 5. Parse out your specific server payload string structure
+//    const configData = JSON.parse(decodedText);
+//    
+//    feedbackMessage.value = 'Configuration loaded successfully!';
+//    feedbackStatus.value = 'success';
+//
+//    // 6. Push the data package back up to your global store action listeners
+//    emit('configScanned', configData);
+//  } catch (err) {
+//    // The scanned code was not your specific JSON server format. Keep scanning!
+//    feedbackMessage.value = 'Invalid QR layout. Please scan a valid server setup code.';
+//    feedbackStatus.value = 'warning';
+//  }
+//};
+const onQrCodeDetected = async (decodedText) => {
+  console.log("► Hardware detected raw QR string:", decodedText);
+
+  // 1. STOP THE CAMERA IMMEDIATELY 
+  // Doing this first ensures the camera page doesn't hang if the data processing crashes.
+  await stopCameraStream();
+
+  let payloadToEmit = null;
+
+  try {
+    // 2. Try parsing it as a structured server JSON object
+    payloadToEmit = JSON.parse(decodedText);
+    console.log("► Successfully parsed QR as JSON object:", payloadToEmit);
+  } catch (err) {
+    // 3. Fallback: If it's a raw string/URL instead of JSON, wrap it safely so it doesn't crash
+    console.warn("► QR text is not JSON. Falling back to plain text object mapping.");
+    payloadToEmit = { odataUrl: decodedText };
+  }
+
+  // 4. FORCE THE EMIT TO THE PARENT
+  console.log("► Firing 'scanned' event to parent component now.");
+  emit('scanned', payloadToEmit);
+};
+
+const onScanTickFailure = (error) => {
+  // Triggers continuously on every video frame that does not contain a QR code.
+  // We keep this function entirely silent to preserve memory performance.
+};
+
+const stopCameraStream = async () => {
+  if (scannerInstance && scannerInstance.isScanning) {
+    try {
+      await scannerInstance.stop();
+      console.log('Webcam track closed cleanly.');
+    } catch (err) {
+      console.error('Failed stopping scanner frame loop threads:', err);
     }
-  } catch (error) {
-    console.error('Error accessing camera hardware:', error);
-    cameraError.value = 'Camera access denied or unavailable.';
   }
 };
 
-const stopWebcam = () => {
-  // Gracefully stop all background camera tracking paths to turn off device indicator lights
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-    localStream = null;
-  }
-};
-
-const emitClose = () => {
-  stopWebcam();
+const handleCancel = async () => {
+  await stopCameraStream();
   emit('close');
-};
-
-const emitFakeScan = () => {
-  const mockPayload = {
-    url: "https://localhost:4004/odata/v4/catalog",
-    timestamp: Date.now()
-  };
-  emit('scanned', mockPayload);
 };
 </script>
 
+
 <style scoped>
+/*
 .scanner-fullscreen-shell {
   position: fixed;
   top: 0;
@@ -160,7 +187,6 @@ const emitFakeScan = () => {
   overflow: hidden;
 }
 
-/* Fullscreen absolute background webcam video alignment styling */
 .webcam-stream {
   position: absolute;
   top: 0;
@@ -171,7 +197,6 @@ const emitFakeScan = () => {
   z-index: 1;
 }
 
-/* Bring focus bounding boxes and instructions out cleanly on top of webcams feeds */
 .capture-target-box {
   width: 220px;
   height: 220px;
@@ -180,7 +205,7 @@ const emitFakeScan = () => {
   position: relative;
   background-color: rgba(0, 0, 0, 0.15);
   z-index: 2;
-  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45); /* Creates a dim overlay mask surrounding target frame */
+  box-shadow: 0 0 0 4000px rgba(0, 0, 0, 0.45);
 }
 
 .laser-indicator {
@@ -236,5 +261,40 @@ const emitFakeScan = () => {
 .mock-action-btn:active {
   background-color: #cccccc;
 }
+*/
+.scanner-page {
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  background-color: #0f172a; color: #ffffff;
+  display: flex; flex-direction: column; z-index: 9999;
+}
+.scanner-header {
+  height: 56px; background-color: #1e293b;
+  display: flex; align-items: center; padding: 0 1rem; gap: 1rem;
+}
+.back-btn {
+  background: transparent; border: none; color: #ffffff; font-size: 1rem; cursor: pointer;
+}
+.scanner-body {
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 1.5rem; gap: 1.5rem;
+}
+
+/* Ensure the library injection respects our maximum responsive wrapper limits */
+#qr-code-region {
+  width: 100%; max-width: 400px; border-radius: 12px; overflow: hidden;
+  background-color: #1e293b; border: 2px solid #334155;
+}
+
+/* Deeper element targeting overrides for code injected directly by html5-qrcode */
+:deep(#qr-code-region video) {
+  width: 100% !important; height: auto !important; object-fit: cover !important;
+}
+
+.feedback-banner {
+  padding: 0.75rem 1rem; border-radius: 6px; font-size: 0.9rem; text-align: center; max-width: 400px;
+}
+.feedback-banner.error { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid #ef4444; }
+.feedback-banner.success { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid #10b981; }
+.feedback-banner.warning { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid #f59e0b; }
 </style>
 

@@ -122,8 +122,25 @@ const isQrScannerOpen = ref(false);
 const closeScanner = () => {
 	isQrScannerOpen.value = false;
 };
-const handleScan = () => {
-	isQrScannerOpen.value = false;
+const handleScan = (scanData) => {
+  console.log("Applying scanned parameters to local config form:", scanData);
+
+  // Safely guard against empty or corrupted scan payloads
+  if (scanData) {
+    // Direct mapping to update your form's reactive input elements
+    if (scanData.odataUrl) localConfig.value.odataUrl = scanData.odataUrl;
+    if (scanData.username) localConfig.value.username = scanData.username;
+    if (scanData.password) localConfig.value.password = scanData.password;
+    if (scanData.networkTimeoutMs) localConfig.value.networkTimeoutMs = Number(scanData.networkTimeoutMs);
+    
+    // Explicitly handle Boolean state updates
+    if (typeof scanData.useDummyData !== 'undefined') {
+      localConfig.value.useDummyData = !!scanData.useDummyData;
+    }
+  }
+
+  // Dismiss the fullscreen camera scanner overlay
+  isQrScannerOpen.value = false;
 };
 
 const localConfig = ref({
