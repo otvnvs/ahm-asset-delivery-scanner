@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+# --- DEFAULT CONFIGURATION ---
+CHUNK_SIZE=4096
+
+# --- HELP MENU SYSTEM ---
+show_help() {
+  cat <<EOF
+Usage: aichunk [-s chunk_size] [-h|--help] [file_or_dir ...]
+
+A terminal-based tool to scan specified files or directories,
+partition file contents into structured sequential blocks,
+and navigate them using a Vim-like event loop.
+
+Options:
+  -s Override the chunk size footprint in bytes (Default: 4096).
+  -h Display this command-line help interface and exit cleanly.
+
+Controls (Inside UI):
+  j/[Down Arrow]  Advance to the next text chunk.
+  k/[Up Arrow]    Regress to the previous text chunk.
+  /               Filter filenames recursively via find+grep.
+  n/N             Jump to the first chunk of the next/prev file match.
+  c               Pipe current chunk to system clipboard and advance.
+  q               Abort script execution and restore terminal layout.
+EOF
+}
+
+# --- FLAGS INTERPRETER AND NORMALIZATION ---
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    --help) args+=("-h") ;;
+    *) args+=("$arg") ;;
+  esac
+done
+set -- "${args[@]}"
+
+# Parse core switches using standard getopts
+while getopts"s:h" opt; do
+  case "$opt" in
+    s)
+      if [[ "$OPTARG" =~ ^[0-9]+$ ]] && [ "$OPTARG" -gt 0 ]; then
+        CHUNK_SIZE="$OPTARG"
+      else
+        echo "Error: Chunk size must be a positive integer." >&2
+        exit 1
+      fi
+      ;;
+    h)
+      show_help
+      exit 0
+      ;;
+    *)
+      show_help >&2
+      exit 1
+      ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+# --- SYSTEM CLIPBOARD AUTO-DETECTION ---
+CLIP_CMD=""
+if command -v pbcopy &>/dev/null; then
+  CLIP_CMD="pbcopy"
+elif command -v xclip &>/dev/null; then
+  CLIP_CMD="xclip -selection clipboard"
+elif command -v xsel &>/dev/null; then
+  CLIP_CMD="xsel --clipboard --input"
+fi
+
+ALL_FILENAMES=()
+ALL_CHUNK_IDS=()
+ALL_MAX_CHUNKS=()
+ALL_CONTENTS=()
+
+echo "Scanning files and loading chunks (Size: ${CHUNK_SIZE}B)..."
+
+# --- POSITION ARGUMENTS PROCESSING ---
+# If no targets are provided, default to the current directory
+TARGET_PATHS=("$@")
+if [ ${#TARGET_PATHS[@]} -eq 0 ]; then
+  TARGET_PATHS=(".")
+fi
+
+# Generate the file list based on target inputs safely
+FILE_LIST=()
+for TARGET in "${TARGET_PATHS[@]}"; do
+  if [ -d "$TARGET" ]; then
+    # Recursively find files in the directory
+    while IFS= read -r -d '' FILE; do
+      FILE_LIST+=("$FILE")
+    done < <(find "$TARGET" -type f -print0 2>/dev/null)
+  elif [ -f "$TARGET" ]; then
+    FILE_LIST+=("$TARGET")
+  else
+    echo "Warning: '$TARGET' is not a valid file or directory. Skipping." >&2
+  fi
+done
+
+# --- CHUNK PROCESSING LOOP ---
+for INPUT_FILE in "${FILE_LIST[@]}"; do
+  # Normalize display name to strip leading './' if present
+  DISPLAY_NAME="${INPUT_FILE#./}"
+  FILE_CHUNKS=()
+  RAW_INDEX=1
+  
+  while true; do
+    OUTPUT=$(sqminify "$INPUT_FILE" 2>/dev/null | sqchunk -s "$CHUNK_SIZE" -n "$RAW_INDEX" 2>/dev/null)
+    if [ -z "$OUTPUT" ]; then
+      break
+    fi
+    FILE_CHUNKS+=("$OUTPUT")
+    ((RAW_INDEX++))
+  done
+  
+  TOTAL_CHUNKS=${#FILE_CHUNKS[@]}
+  for ((i=0; i<TOTAL_CHUNKS; i++)); do
+    ALL_FILENAMES+=("$DISPLAY_NAME")
+    ALL_CHUNK_IDS+=("$i")
+    ALL_MAX_CHUNKS+=("$((TOTAL_CHUNKS - 1))")
+    ALL_CONTENTS+=("${FILE_CHUNKS[$i]}")
+  done
+done
+
+TOTAL_GLOBAL_CHUNKS=${#ALL_CONTENTS[@]}
+if [ "$TOTAL_GLOBAL_CHUNKS" -eq 0 ]; then
+  echo "No content found to display."
+  exit 0
+fi
+
+GLOBAL_INDEX=0
+SEARCH_QUERY=""
+MATCHING_INDICES=()
+CURRENT_MATCH_PTR=-1
+NOTIFICATION_MSG=""
+
+trap 'tput cnorm; clear; exit 0' INT TERM EXIT
+
+while true; do
+  tput civvis
+  clear
+  F_NAME="${ALL_FILENAMES[$GLOBAL_INDEX]}"
+  C_ID="${ALL_CHUNK_IDS[$GLOBAL_INDEX]}"
+  M_ID="${ALL_MAX_CHUNKS[$GLOBAL_INDEX]}"
+  CONTENT="${ALL_CONTENTS[$GLOBAL_INDEX]}"
+  
+  # --- STATIC TOP CONTROL BOX ---
+  echo "========================================================================"
+  printf " FILE   : %s\n" "$F_NAME"
+  printf " CHUNK  : %d / %d  (Global Item %d / %d) | Size: %sB\n" "$C_ID" "$M_ID" "$((GLOBAL_INDEX + 1))" "$TOTAL_GLOBAL_CHUNKS" "$CHUNK_SIZE"
+  
+  if [ -n "$SEARCH_QUERY" ]; then
+    TOTAL_MATCHES=${#MATCHING_INDICES[@]}
+    if [ "$TOTAL_MATCHES" -gt 0 ]; then
+      printf " FIND   : grep \"%s\"  (Match %d of %d)\n" "$SEARCH_QUERY" "$((CURRENT_MATCH_PTR + 1))" "$TOTAL_MATCHES"
+    else
+      printf " FIND   : grep \"%s\"  (No matching files found)\n" "$SEARCH_QUERY"
+    fi
+  else
+    echo " SEARCH : Press [/] to filter filenames using find + grep"
+  fi
+  echo " CONTROLS: [j/k] Down/Up | [/] Find File | [c] Copy Chunk | [q] Quit"
+  echo "========================================================================"
+  
+  if [ -n "$NOTIFICATION_MSG" ]; then
+    printf "\033[1;32m%s\033[0m\n" "$NOTIFICATION_MSG"
+    NOTIFICATION_MSG=""
+  else
+    echo ""
+  fi
+  
+  # --- CHUNK CONTENT ---
+  printf "%s\n" "$CONTENT"
+  
+  read -r -n 1 -s KEY </dev/tty
+  if [[ "$KEY" == $'\e' ]]; then
+    read -r -n 2 -s REST </dev/tty
+    KEY+="$REST"
+  fi
+  
+  case "$KEY" in
+    "j"|$'\e[B')
+      if [ "$GLOBAL_INDEX" -lt "$((TOTAL_GLOBAL_CHUNKS - 1))" ]; then
+        ((GLOBAL_INDEX++))
+      fi
+      ;;
+    "k"|$'\e[A')
+      if [ "$GLOBAL_INDEX" -gt 0 ]; then
+        ((GLOBAL_INDEX--))
+      fi
+      ;;
+    "c"|"C")
+      if [ -n "$CLIP_CMD" ]; then
+        printf "[%s][chunk %d of %d]:\n%s" "$F_NAME" "$C_ID" "$M_ID" "$CONTENT" | eval "$CLIP_CMD"
+        NOTIFICATION_MSG=" -> Copied [CHUNK $C_ID] with headers to clipboard!"
+      else
+        NOTIFICATION_MSG=" -> Error: Clipboard utility not found."
+      fi
+      if [ "$GLOBAL_INDEX" -lt "$((TOTAL_GLOBAL_CHUNKS - 1))" ]; then
+        ((GLOBAL_INDEX++))
+      fi
+      ;;
+    "/")
+      tput cnorm
+      echo ""
+      read -r -p "Grep filename pattern: " SEARCH_QUERY </dev/tty
+      MATCHING_INDICES=()
+      CURRENT_MATCH_PTR=-1
+      
+      if [ -n "$SEARCH_QUERY" ]; then
+        # Search against loaded files instead of hitting the filesystem again
+        for idx in "${!ALL_FILENAMES[@]}"; do
+          if echo "${ALL_FILENAMES[$idx]}" | grep -iq "$SEARCH_QUERY"; then
+            if [ "${ALL_CHUNK_IDS[$idx]}" -eq 0 ]; then
+              MATCHING_INDICES+=("$idx")
+            fi
+          fi
+        done
+        
+        if [ "${#MATCHING_INDICES[@]}" -gt 0 ]; then
+          CURRENT_MATCH_PTR=0
+          GLOBAL_INDEX="${MATCHING_INDICES[0]}"
+        fi
+      fi
+      ;;
+    "n")
+      TOTAL_MATCHES=${#MATCHING_INDICES[@]}
+      if [ "$TOTAL_MATCHES" -gt 0 ]; then
+        CURRENT_MATCH_PTR=$(((CURRENT_MATCH_PTR + 1) % TOTAL_MATCHES))
+        GLOBAL_INDEX="${MATCHING_INDICES[$CURRENT_MATCH_PTR]}"
+      fi
+      ;;
+    "N")
+      TOTAL_MATCHES=${#MATCHING_INDICES[@]}
+      if [ "$TOTAL_MATCHES" -gt 0 ]; then
+        CURRENT_MATCH_PTR=$(((CURRENT_MATCH_PTR - 1 + TOTAL_MATCHES) % TOTAL_MATCHES))
+        GLOBAL_INDEX="${MATCHING_INDICES[$CURRENT_MATCH_PTR]}"
+      fi
+      ;;
+    "q"|"Q")
+      break
+      ;;
+  esac
+done
+

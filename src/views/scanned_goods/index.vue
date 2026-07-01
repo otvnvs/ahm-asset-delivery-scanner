@@ -128,31 +128,74 @@ const handleDeleteAll = () => {
   router.push('/register_delivery');
 };
 
+//const handleSaveServer = async () => {
+//  if (!activeDeliveryDoc.value) return;
+//
+//  isSubmitting.value = true;
+//  statusBanner.value = null;
+//
+//  try {
+//	window.activeDeliveryDoc=activeDeliveryDoc//sq
+//	window.scannedItems=scannedItems.value//sq
+//    console.log("Posting local verification cache arrays downstream via Entity Service...");
+//    
+//    // Dispatches the sanitized parameters safely to your Node.js CAP backend
+//    await EntityService.submitGoodsReceiptTransaction(
+//      activeDeliveryDoc.value.id, 
+//      scannedItems.value
+//    );
+//
+//    console.log("[SERVER SUCCESS] Server save confirmed. Purging delivery data from localstorage...");
+//    
+//    // Clears the cache node array value dynamically from localstorage
+//    storeActions.clearActiveDeliveryCache();
+//    
+//    statusBanner.value = {
+//      status: 'success',
+//      message: 'Transaction saved to server! Cache cleared.'
+//    };
+//
+//    setTimeout(() => {
+//      router.push('/home');
+//    }, 1000);
+//
+//  } catch (error) {
+//    console.error("[SAVE FAILED] Transaction aborted:", error);
+//    statusBanner.value = {
+//      status: 'failed',
+//      message: `Failed to save to server: ${error.message}`
+//    };
+//  } finally {
+//    isSubmitting.value = false;
+//  }
+//};
+// --- UPDATE INSIDE ./src/views/scanned_goods/index.vue ---
 const handleSaveServer = async () => {
   if (!activeDeliveryDoc.value) return;
-
+  
   isSubmitting.value = true;
   statusBanner.value = null;
 
   try {
-	window.activeDeliveryDoc=activeDeliveryDoc//sq
-	window.scannedItems=scannedItems.value//sq
-    console.log("Posting local verification cache arrays downstream via Entity Service...");
+    // Debug hooks requested in original source
+    window.activeDeliveryDoc = activeDeliveryDoc;
+    window.scannedItems = scannedItems.value;
+
+    console.log("[UI WORKFLOW] Invoking transaction state machine execution framework...");
     
-    // Dispatches the sanitized parameters safely to your Node.js CAP backend
-    await EntityService.submitGoodsReceiptTransaction(
+    // Fire the entire sequence cleanly: Header -> Lines -> Activation
+    await EntityService.executeDraftGoodsReceiptPipeline(
       activeDeliveryDoc.value.id, 
-      scannedItems.value
+      scannedItems.value,
+      "2026-06-22" // Use the date required by your business criteria
     );
 
-    console.log("[SERVER SUCCESS] Server save confirmed. Purging delivery data from localstorage...");
-    
-    // Clears the cache node array value dynamically from localstorage
+    console.log("[SERVER SUCCESS] Entire RAP processing sequence completed without errors. Flushing UI workspace state...");
     storeActions.clearActiveDeliveryCache();
     
-    statusBanner.value = {
-      status: 'success',
-      message: 'Transaction saved to server! Cache cleared.'
+    statusBanner.value = { 
+      status: 'success', 
+      message: 'Goods Receipt Document activated on SAP successfully!' 
     };
 
     setTimeout(() => {
@@ -160,10 +203,10 @@ const handleSaveServer = async () => {
     }, 1000);
 
   } catch (error) {
-    console.error("[SAVE FAILED] Transaction aborted:", error);
-    statusBanner.value = {
-      status: 'failed',
-      message: `Failed to save to server: ${error.message}`
+    console.error("[UI WORKFLOW ERROR] Pipeline collapsed:", error);
+    statusBanner.value = { 
+      status: 'failed', 
+      message: `Failed to commit to SAP: ${error.message}` 
     };
   } finally {
     isSubmitting.value = false;

@@ -3,12 +3,18 @@ import { store } from './store.js';
 // In-memory cache for the validated token to prevent redundant network handshakes
 let cachedCsrfToken = null;
 
+// utility function to get csrf url
+const getCsrfUrl = (str, u = new URL(str)) => `${u.origin}${u.pathname.slice(0, u.pathname.lastIndexOf('/', u.pathname.length - 2) + 1)}`;
+
+
 /**
  * Helper Utility: Performs a standard GET handshake with the SAP Gateway root
  * to fetch and store a fresh operational X-CSRF-Token.
  */
 async function fetchSAPCsrfToken(absoluteBaseUrl) {
   console.log('[SAP CSRF ENGINE] Handshaking with Gateway using GET to fetch a fresh token...');
+
+  absoluteBaseUrl=getCsrfUrl(absoluteBaseUrl)
   
   const headers = new Headers();
   headers.set('X-CSRF-Token', 'Fetch');
@@ -22,7 +28,7 @@ async function fetchSAPCsrfToken(absoluteBaseUrl) {
   try {
     // FIXED: Switched from HEAD to a standard GET against the root service document (/)
     // This is incredibly lightweight and allowed by all standard SAP security profiles
-    const response = await fetch(`${absoluteBaseUrl}/`, {
+    const response = await fetch(`${absoluteBaseUrl}`, {
       method: 'GET',
       headers: headers,
       mode: 'cors'
@@ -47,27 +53,56 @@ async function fetchSAPCsrfToken(absoluteBaseUrl) {
  * High-performance network fetch wrapper configured specifically for SAP Gateway pipelines.
  */
 export async function odataFetch(endpointPath, options = {}) {
-  const { odataUrl, username, password, networkTimeoutMs, useDummyData } = store.config;
+	/*
+// Updated Default State
+const defaultState = {
+  user: { name: 'User', isLoggedIn: false },
+  appPin: null,
+  config: {
+    baseHost: 'https://s4hana2025.professorsoft.com:44300', // New: Common Host
+    poPath: '/sap/opu/odata4/sap/zgr_ui_poscan_o4/srvd_a2x/sap/zgr_ui_poscan_o4/0001/', // New: Register Service
+    grPath: '/sap/opu/odata4/sap/zgr_grdoc_api/srvd_a2x/sap/zgr_ui_grdoc_o4/0001', // New: Goods Receipt Service
+    username: '',
+    password: '',
+    networkTimeoutMs: 5000,
+    useDummyData: false,
+    sapClient: '100' // Optional: Added for completeness
+  },
+  cache: {
+    metadataRawXml: '',
+    entityLists: {}
+  },
+  simulatedOffline: false
+};
 
-  if (!odataUrl) {
-    throw new Error('OData Target Endpoint URL is missing in system settings.');
-  }
+	 */
+  const { baseHost, username, password, networkTimeoutMs, useDummyData } = store.config;
+
+  if (!baseHost)throw new Error('OData Endpoint missing in system settings.');
+  if (!username)throw new Error('OData Username missing in system settings.');
+  if (!password)throw new Error('OData Password missing in system settings.');
 
   // --- LOCAL SERVICE WORKER INTERCEPT FOR DUMMY DATA OFFLINE MODE ---
   if (useDummyData) {
     console.warn(`[SW INTERCEPT ACTIVE] Request passing through to worker layer proxy.`);
   }
 
-  const cleanBase = odataUrl.endsWith('/') ? odataUrl.slice(0, -1) : odataUrl;
+  const cleanBase = baseHost.endsWith('/') ? baseHost.slice(0, -1) : baseHost;
   let cleanPath = endpointPath.startsWith('/') ? endpointPath : `/${endpointPath}`;
   
   // SAP Gateway v4 frequently mandates an explicit format tracking parameter on standard queries
-  if (!cleanPath.includes('$metadata') && !cleanPath.includes('$format')) {
+//  if (!cleanPath.includes('$metadata') && !cleanPath.includes('$format')) {
+//    const separator = cleanPath.includes('?') ? '&' : '?';
+//    cleanPath = `${cleanPath}${separator}$format=json`;
+//  }
+// FIX: Do not append $format=json if it is an SAP Bound Action namespace containing dots
+if (!cleanPath.includes('$metadata') && !cleanPath.includes('$format') && !cleanPath.includes('v0001.')) {
     const separator = cleanPath.includes('?') ? '&' : '?';
     cleanPath = `${cleanPath}${separator}$format=json`;
-  }
+}
 
   const absoluteUrl = `${cleanBase}${cleanPath}`;
+  console.warn("absoluteUrl:"+absoluteUrl);
   const headers = new Headers(options.headers || {});
   
   // Format configurations to resolve 406 Not Acceptable blockers on structural schemas
@@ -92,7 +127,7 @@ export async function odataFetch(endpointPath, options = {}) {
   if (isModifyingRequest && !useDummyData) {
     // 1. Fetch a fresh token if the local in-memory cache is empty
     if (!cachedCsrfToken) {
-      await fetchSAPCsrfToken(cleanBase);
+      await fetchSAPCsrfToken(absoluteUrl)
     }
     
     // 2. Append the valid token to the outbound operation payload header group
@@ -120,7 +155,7 @@ export async function odataFetch(endpointPath, options = {}) {
       
       // Clear expired token and fetch a new one
       cachedCsrfToken = null;
-      const freshToken = await fetchSAPCsrfToken(cleanBase);
+      const freshToken = await fetchSAPCsrfToken(absoluteUrl);
       
       if (freshToken) {
         headers.set('X-CSRF-Token', freshToken);
