@@ -1,0 +1,577 @@
+<template>
+  <div class="app-layout receipt-item-view">
+    <MenuTop title="RECEIPT ITEM" />
+
+    <!-- Main Workspace Area -->
+    <main class="app-content content-workspace">
+      <!-- Fallback Error View if no item matches the query code -->
+      <div v-if="!activeItem" class="empty-state-card">
+        <p class="empty-text">Target item code could not be loaded from cache.</p>
+        <router-link to="/po_items" class="return-link">Return to PO Items</router-link>
+      </div>
+
+      <!-- Top Info Summary Card Details -->
+      <div v-else class="summary-wrapper-stack">
+        <div class="summary-card">
+          <!-- Dynamically maps normalized descriptive text values directly from your store schema -->
+          <h2 class="product-title">{{ activeItem.description }}</h2>
+          
+          <div class="meta-grid">
+            <div class="meta-label">Article: <span class="meta-val">{{ activeItem.code }}</span></div>
+            <div class="meta-label text-right">Item: <span class="meta-val">{{ activeItem.itemNumber }}</span></div>
+          </div>
+
+          <div class="status-counter" :class="{ 'has-qty': quantity > 0 }">
+            {{ quantity }} / {{ activeItem.targetQty }} {{ activeItem.uom }} - captured
+          </div>
+
+          <div class="vendor-stamp">Vendor Arg. {{ activeItem.vendorId }}</div>
+        </div>
+
+        <!-- Quantity Stepper Calculator Row Controls -->
+	<!--
+        <div class="stepper-row">
+          <button class="step-btn" @click="adjustQty(-5)">&lt; 5</button>
+          <button class="step-btn" @click="adjustQty(-1)">-</button>
+          <button class="step-btn" @click="adjustQty(1)">+</button>
+          <button class="step-btn" @click="adjustQty(5)">5 &gt;</button>
+        </div>
+	-->
+		<div class="stepper-row">
+		  <button 
+		    ref="stepBtn0"
+		    class="step-btn" 
+		    @click="adjustQty(-5)"
+		    @keydown.right.prevent="$refs.stepBtn1.focus()"
+		    aria-label="Decrease quantity by 5"
+		  >&lt; 5</button>
+		  
+		  <button 
+		    ref="stepBtn1"
+		    class="step-btn" 
+		    @click="adjustQty(-1)"
+		    @keydown.left.prevent="$refs.stepBtn0.focus()"
+		    @keydown.right.prevent="$refs.stepBtn2.focus()"
+		    aria-label="Decrease quantity by 1"
+		  >-</button>
+		  
+		  <button 
+		    ref="stepBtn2"
+		    class="step-btn" 
+		    @click="adjustQty(1)"
+		    @keydown.left.prevent="$refs.stepBtn1.focus()"
+		    @keydown.right.prevent="$refs.stepBtn3.focus()"
+		    aria-label="Increase quantity by 1"
+		  >+</button>
+		  
+		  <button 
+		    ref="stepBtn3"
+		    class="step-btn" 
+		    @click="adjustQty(5)"
+		    @keydown.left.prevent="$refs.stepBtn2.focus()"
+		    aria-label="Increase quantity by 5"
+		  >5 &gt;</button>
+		</div>
+
+
+        <!-- Exception Flag Row Toggles -->
+        <div class="toggles-list">
+          
+          <!-- Condition 1: Damages Flag -->
+<!--
+          <div class="toggle-row">
+            <span class="toggle-label">Damages</span>
+            <div class="binary-switch">
+              <button 
+                type="button" 
+                class="switch-btn segment-no" 
+                :class="{ active: !flags.damages }"
+                @click="flags.damages = false"
+              >NO</button>
+              <button 
+                type="button" 
+                class="switch-btn segment-yes" 
+                :class="{ active: flags.damages }"
+                @click="flags.damages = true"
+              >YES</button>
+            </div>
+          </div>
+-->
+<div class="toggles-list">
+  <!-- Condition 1: Damages Flag -->
+  <div class="toggle-row">
+    <span class="toggle-label" id="label-damages">Damages</span>
+    
+    <div 
+      class="binary-switch"
+      tabindex="0"
+      role="radiogroup"
+      aria-labelledby="label-damages"
+      @keydown.left.prevent="flags.damages = false"
+      @keydown.right.prevent="flags.damages = true"
+      @keydown.space.prevent="flags.damages = !flags.damages"
+    >
+      <button
+        type="button"
+        tabindex="-1"
+        class="switch-btn segment-no"
+        :class="{ active: !flags.damages }"
+        :aria-checked="!flags.damages"
+        role="radio"
+        @click="flags.damages = false"
+      >NO</button>
+      <button
+        type="button"
+        tabindex="-1"
+        class="switch-btn segment-yes"
+        :class="{ active: flags.damages }"
+        :aria-checked="flags.damages"
+        role="radio"
+        @click="flags.damages = true"
+      >YES</button>
+    </div>
+  </div>
+</div>
+
+
+          <!-- Condition 2: No Barcode Flag -->
+<!--
+          <div class="toggle-row">
+            <span class="toggle-label">No Barcode</span>
+            <div class="binary-switch">
+              <button 
+                type="button" 
+                class="switch-btn segment-no" 
+                :class="{ active: !flags.noBarcode }"
+                @click="flags.noBarcode = false"
+              >NO</button>
+              <button 
+                type="button" 
+                class="switch-btn segment-yes" 
+                :class="{ active: flags.noBarcode }"
+                @click="flags.noBarcode = true"
+              >YES</button>
+            </div>
+          </div>
+-->
+<div class="toggle-row">
+  <span class="toggle-label" id="label-no-barcode">No Barcode</span>
+  
+  <div 
+    class="binary-switch"
+    tabindex="0"
+    role="radiogroup"
+    aria-labelledby="label-no-barcode"
+    @keydown.left.prevent="flags.noBarcode = false"
+    @keydown.right.prevent="flags.noBarcode = true"
+    @keydown.space.prevent="flags.noBarcode = !flags.noBarcode"
+  >
+    <button
+      type="button"
+      tabindex="-1"
+      class="switch-btn segment-no"
+      :class="{ active: !flags.noBarcode }"
+      :aria-checked="!flags.noBarcode"
+      role="radio"
+      @click="flags.noBarcode = false"
+    >NO</button>
+    <button
+      type="button"
+      tabindex="-1"
+      class="switch-btn segment-yes"
+      :class="{ active: flags.noBarcode }"
+      :aria-checked="flags.noBarcode"
+      role="radio"
+      @click="flags.noBarcode = true"
+    >YES</button>
+  </div>
+</div>
+
+
+          <!-- Condition 3: Invalid Barcode Flag -->
+<!--
+          <div class="toggle-row">
+            <span class="toggle-label">Invalid Barcode</span>
+            <div class="binary-switch">
+              <button 
+                type="button" 
+                class="switch-btn segment-no" 
+                :class="{ active: !flags.invalidBarcode }"
+                @click="flags.invalidBarcode = false"
+              >NO</button>
+              <button 
+                type="button" 
+                class="switch-btn segment-yes" 
+                :class="{ active: flags.invalidBarcode }"
+                @click="flags.invalidBarcode = true"
+              >YES</button>
+            </div>
+          </div>
+-->
+          <div class="toggle-row">
+            <span class="toggle-label" id="label-invalid-barcode">Invalid Barcode</span>
+            <div 
+              class="binary-switch"
+              tabindex="0"
+              role="radiogroup"
+              aria-labelledby="label-invalid-barcode"
+              @keydown.left.prevent="flags.invalidBarcode = false"
+              @keydown.right.prevent="flags.invalidBarcode = true"
+              @keydown.space.prevent="flags.invalidBarcode = !flags.invalidBarcode"
+            >
+              <button
+                type="button"
+                tabindex="-1"
+                class="switch-btn segment-no"
+                :class="{ active: !flags.invalidBarcode }"
+                :aria-checked="!flags.invalidBarcode"
+                role="radio"
+                @click="flags.invalidBarcode = false"
+              >NO</button>
+              <button
+                type="button"
+                tabindex="-1"
+                class="switch-btn segment-yes"
+                :class="{ active: flags.invalidBarcode }"
+                :aria-checked="flags.invalidBarcode"
+                role="radio"
+                @click="flags.invalidBarcode = true"
+              >YES</button>
+            </div>
+          </div>
+
+
+        </div>
+
+        <!-- Bottom Form Control Action Buttons Row -->
+        <div class="form-actions-row">
+          <!-- Clear / Reset Parameters Trigger -->
+          <button type="button" class="action-btn-clear" @click="handleClear">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2.5" fill="none">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+            Clear
+          </button>
+
+          <!-- Save / Persist Entry Data Trigger -->
+          <button type="button" class="action-btn-save" @click="handleSave">
+            <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none">
+              <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+              <polyline points="17 21 17 13 7 13 7 21"></polyline>
+              <polyline points="7 3 3 7 8 15 8"></polyline>
+            </svg>
+            Save
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted } from 'vue';
+import { useRouter, useRoute } from 'vue-router';
+import MenuTop from '../../components/menutop/index.vue';
+import { store } from '../../util/store.js';
+
+const router = useRouter();
+const route = useRoute();
+
+// Capture targeted query parameter from route address links
+const targetArticleCode = ref(route.query.articleCode || '');
+
+const quantity = ref(0);
+const flags = ref({
+  damages: false,
+  noBarcode: false,
+  invalidBarcode: false
+});
+
+/**
+ * Computed Reference Core:
+ * Looks up the correct array record envelope from store memory matching the article code query parameter
+ */
+const activeItem = computed(() => {
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return null;
+  
+  // Safely grab the first matched document frame from the lookup array container
+  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  if (!activeDoc || !activeDoc.items) return null;
+
+  return activeDoc.items.find(item => item.code === targetArticleCode.value) || null;
+});
+
+// Seed current captured values from persistent store cache memory onto form controls layout on load
+onMounted(() => {
+  if (activeItem.value) {
+    quantity.value = activeItem.value.recptQty || 0;
+    if (activeItem.value.flags) {
+      flags.value.damages = !!activeItem.value.flags.damages;
+      flags.value.noBarcode = !!activeItem.value.flags.noBarcode;
+      flags.value.invalidBarcode = !!activeItem.value.flags.invalidBarcode;
+    }
+  }
+});
+
+const adjustQty = (amount) => {
+  quantity.value = Math.max(0, quantity.value + amount);
+};
+
+const handleClear = () => {
+  console.log("[FORM ACTION] Resetting input trackers to default states...");
+  quantity.value = 0;
+  flags.value.damages = false;
+  flags.value.noBarcode = false;
+  flags.value.invalidBarcode = false;
+};
+
+// Directly writes edited parameters back down to your reactive localStorage cache layer reference
+const handleSave = () => {
+  if (!activeItem.value) return;
+
+  console.log(`[STORE WRITE] Committing quantities back onto product row cache target: ${activeItem.value.code}`);
+
+  // Mutates store properties inside memory; deep-watch auto-triggers localStorage disk backup serialization sequence
+  activeItem.value.recptQty = parseInt(quantity.value, 10) || 0;
+  activeItem.value.flags = {
+    damages: !!flags.value.damages,
+    noBarcode: !!flags.value.noBarcode,
+    invalidBarcode: !!flags.value.invalidBarcode
+  };
+
+  // Return user back to PO Items summary table checklist screen track cleanly
+  router.push('/po_items');
+};
+</script>
+
+
+
+
+
+<style scoped>
+.receipt-item-view {
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  box-sizing: border-box;
+}
+
+.content-workspace {
+  padding-top: 5.5rem !important;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  padding-bottom: 1.5rem;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: center;
+}
+
+/* Info Summary Card styling wrapper block */
+.summary-card {
+  width: 100%;
+  max-width: 440px;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1.25rem;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.product-title {
+  font-size: 1.15rem;
+  font-weight: bold;
+  line-height: 1.4;
+  margin: 0 0 0.75rem 0;
+  color: var(--text-main);
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin-bottom: 1.25rem;
+}
+
+.meta-label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+.meta-val {
+  color: var(--text-main);
+}
+
+.text-right {
+  text-align: right;
+}
+
+/* Captured Quantity Text Field feedback selector color tracking */
+.status-counter {
+  font-size: 1.35rem;
+  font-weight: bold;
+  font-family: monospace;
+  color: #555555; /* Neutral dark status default when 0 items exist */
+  margin-bottom: 0.5rem;
+}
+
+.status-counter.has-qty {
+  color: var(--accent-color); /* Transforms immediately into green accent color */
+}
+
+.vendor-stamp {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  font-family: monospace;
+}
+
+/* Stepper incremental matrix layout styling keys */
+.stepper-row {
+  width: 100%;
+  max-width: 440px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.step-btn {
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  color: var(--text-main);
+  border-radius: 6px;
+  padding: 0.85rem 0;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  outline: none;
+  font-family: monospace;
+}
+
+.step-btn:active {
+  background-color: var(--border-color);
+}
+
+.step-btn:focus,
+.step-btn:focus-visible {
+  background-color: var(--border-color);
+}
+
+/* Exception flag toggle lists mapping rules */
+.toggles-list {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.toggle-row {
+  width: 100%;
+  background-color: var(--surface-color);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 0.65rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.toggle-label {
+  font-size: 1rem;
+  color: var(--text-main);
+}
+
+/* Custom segmented controls styling tracks */
+.binary-switch {
+  display: flex;
+  background-color: #121214;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+  padding: 2px;
+}
+
+.switch-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  padding: 0.5rem 1.15rem;
+  font-size: 0.85rem;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 4px;
+  outline: none;
+  transition: all 0.1s ease;
+}
+
+/* Toggle option highlight background states */
+.switch-btn.segment-no.active {
+  background-color: #00e676; /* Standard layout neon active state green color token */
+  color: #121214;
+}
+
+.switch-btn.segment-yes.active {
+  background-color: #00e676;
+  color: #121214;
+}
+
+/* Footer Action Buttons Section Layout */
+.form-actions-row {
+  width: 100%;
+  max-width: 440px;
+  display: grid;
+  grid-template-columns: 1fr 1.25fr; /* Matches the layout ratio of save button dominance */
+  gap: 0.75rem;
+  margin-top: auto; /* Pushes the button array downward comfortably */
+  padding-top: 1rem;
+}
+
+/* Red Clear Button */
+.action-btn-clear {
+  background-color: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171; /* Accent red font tone */
+  border-radius: 6px;
+  padding: 0.9rem 0;
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.action-btn-clear:active {
+  background-color: rgba(239, 68, 68, 0.1);
+}
+
+/* Green Bright Save Action Button */
+.action-btn-save {
+  background-color: #00e676;
+  color: #121214;
+  border: none;
+  border-radius: 6px;
+  padding: 0.9rem 0;
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0, 230, 118, 0.15);
+}
+
+.action-btn-save:active {
+  opacity: 0.9;
+}
+</style>
+
