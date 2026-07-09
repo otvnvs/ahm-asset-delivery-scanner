@@ -18,43 +18,258 @@
 </template>
 
 <script setup>
+//import { ref, onMounted, onBeforeUnmount } from 'vue';
+//import Html5QrCode from '../../../lib/html5-qrcode/html5-qrcode.min.js';
+//
+//// Define the component communication events
+//const emit = defineEmits(['close', 'scanned']);
+//
+//const feedbackMessage = ref('Initializing camera matrix...');
+//const feedbackStatus = ref('');
+//let scannerInstance = null;
+//
+//onMounted(() => {
+//  // 1. Initialize the engine targeting our div ID
+//  // Depending on your wrapper method, check if you need: new Html5QrCode.Html5Qrcode(...)
+//  scannerInstance = new Html5QrCode.Html5Qrcode("qr-code-region");
+//  
+//  startCameraStream();
+//});
+//
+//onBeforeUnmount(() => {
+//  // 2. Crucial: Release hardware locks cleanly if user changes pages/tabs
+//  stopCameraStream();
+//});
+//
+//const startCameraStream = async () => {
+//  try {
+//    const config = { 
+//      fps: 10, 
+//      qrbox: { width: 250, height: 250 } 
+//    };
+//
+//    // 3. Start hardware video capture tracking
+//    await scannerInstance.start(
+//      { facingMode: "environment" }, // Forces mobile rear camera layout
+//      config,
+//      onQrCodeDetected,
+//      onScanTickFailure
+//    );
+//    
+//    feedbackMessage.value = 'Align the server QR code inside the bounding box.';
+//    feedbackStatus.value = '';
+//  } catch (err) {
+//    feedbackMessage.value = `Camera Activation Failed: ${err}`;
+//    feedbackStatus.value = 'error';
+//    console.error(err);
+//  }
+//};
+//
+////const onQrCodeDetected = async (decodedText) => {
+////  try {
+////    // 4. Kill the active camera stream instantly to stop duplicate scan events
+////    await stopCameraStream();
+////
+////    // 5. Parse out your specific server payload string structure
+////    const configData = JSON.parse(decodedText);
+////    
+////    feedbackMessage.value = 'Configuration loaded successfully!';
+////    feedbackStatus.value = 'success';
+////
+////    // 6. Push the data package back up to your global store action listeners
+////    emit('configScanned', configData);
+////  } catch (err) {
+////    // The scanned code was not your specific JSON server format. Keep scanning!
+////    feedbackMessage.value = 'Invalid QR layout. Please scan a valid server setup code.';
+////    feedbackStatus.value = 'warning';
+////  }
+////};
+//const onQrCodeDetected = async (decodedText) => {
+//  console.log("► Hardware detected raw QR string:", decodedText);
+//
+//  // 1. STOP THE CAMERA IMMEDIATELY 
+//  // Doing this first ensures the camera page doesn't hang if the data processing crashes.
+//  await stopCameraStream();
+//
+//  let payloadToEmit = null;
+//
+//  try {
+//    // 2. Try parsing it as a structured server JSON object
+//    payloadToEmit = JSON.parse(decodedText);
+//    console.log("► Successfully parsed QR as JSON object:", payloadToEmit);
+//  } catch (err) {
+//    // 3. Fallback: If it's a raw string/URL instead of JSON, wrap it safely so it doesn't crash
+//    console.warn("► QR text is not JSON. Falling back to plain text object mapping.");
+//    payloadToEmit = { odataUrl: decodedText };
+//  }
+//
+//  // 4. FORCE THE EMIT TO THE PARENT
+//  console.log("► Firing 'scanned' event to parent component now.");
+//  emit('scanned', payloadToEmit);
+//};
+//
+//const onScanTickFailure = (error) => {
+//  // Triggers continuously on every video frame that does not contain a QR code.
+//  // We keep this function entirely silent to preserve memory performance.
+//};
+//
+//const stopCameraStream = async () => {
+//  if (scannerInstance && scannerInstance.isScanning) {
+//    try {
+//      await scannerInstance.stop();
+//      console.log('Webcam track closed cleanly.');
+//    } catch (err) {
+//      console.error('Failed stopping scanner frame loop threads:', err);
+//    }
+//  }
+//};
+//
+//const handleCancel = async () => {
+//  await stopCameraStream();
+//  emit('close');
+//};
+//--------------------------------------------------------------------------------
 import { ref, onMounted, onBeforeUnmount } from 'vue';
 import Html5QrCode from '../../../lib/html5-qrcode/html5-qrcode.min.js';
 
-// Define the component communication events
 const emit = defineEmits(['close', 'scanned']);
-
 const feedbackMessage = ref('Initializing camera matrix...');
 const feedbackStatus = ref('');
 let scannerInstance = null;
 
-onMounted(() => {
-  // 1. Initialize the engine targeting our div ID
-  // Depending on your wrapper method, check if you need: new Html5QrCode.Html5Qrcode(...)
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * PURE VANILLA FETCH ENVIRONMENT AUDITOR
+ * Verifies if the container is a native Android WebView host.
+ */
+const checkIsNativeEnvironment = async () => {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 1200);
+    
+    const response = await fetch('/api/app/device-status', {
+      method: 'GET',
+      signal: controller.signal
+    });
+    
+    clearTimeout(timeoutId);
+    if (!response.ok) return false;
+    
+    const data = await response.json();
+    return data.status === 'active';
+  } catch (e) {
+    return false;
+  }
+};
+
+/**
+ * ZERO-DEPENDENCY JUST-IN-TIME PROMPT ENGINE
+ * Orchestrates native security gates using plain fetch calls.
+ */
+const acquireCameraHardwareClearance = async () => {
+  const cameraPermission = 'android.permission.CAMERA';
+  const payloadData = { permissions: [cameraPermission] };
+
+  try {
+    const isNative = await checkIsNativeEnvironment();
+    if (!isNative) {
+      console.log('-> [SCANNER] Running in desktop dev browser fallback mode. Bypassing native hooks.');
+      return true;
+    }
+
+    // Step A: FAST-PATH PRE-CHECK
+    const statusResponse = await fetch('/api/permissions/status', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payloadData)
+    });
+    
+    if (statusResponse.ok) {
+      const matrixData = await statusResponse.json();
+      if (matrixData.permissions_matrix && matrixData.permissions_matrix[cameraPermission] === 'GRANTED') {
+        console.log('-> [SCANNER-FAST-PATH] Camera permission already verified as GRANTED.');
+        return true;
+      }
+    }
+
+    // Step B: TRIGGER PROMPT OVERLAY VIA NATIVE EVENT BUS
+    feedbackMessage.value = 'Requesting system hardware access permissions...';
+    feedbackStatus.value = 'warning';
+
+    const reqResponse = await fetch('/api/permissions/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payloadData)
+    });
+
+    if (reqResponse.status !== 202) {
+      throw new Error(`Native permissions event bus rejected query with status: ${reqResponse.status}`);
+    }
+
+    // Step C: ASYNCHRONOUS POLLING LAYER
+    const maxAttempts = 60; // 30-second timeout safety boundary
+    let currentAttempt = 0;
+    let isGranted = false;
+
+    while (currentAttempt < maxAttempts) {
+      await sleep(500);
+      currentAttempt++;
+
+      const checkResponse = await fetch('/api/permissions/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payloadData)
+      });
+
+      if (checkResponse.ok) {
+        const checkData = await checkResponse.json();
+        if (checkData.permissions_matrix && checkData.permissions_matrix[cameraPermission] === 'GRANTED') {
+          isGranted = true;
+          break;
+        }
+      }
+    }
+
+    return isGranted;
+
+  } catch (err) {
+    console.error('Camera allocation transaction layer collapsed:', err.message);
+    return false;
+  }
+};
+
+onMounted(async () => {
+  // Step 1: Initialize the structural html5-qrcode instance target selector
   scannerInstance = new Html5QrCode.Html5Qrcode("qr-code-region");
   
-  startCameraStream();
+  // Step 2: Fire the zero-dependency permissions checkpoint
+  const pathClearForStreaming = await acquireCameraHardwareClearance();
+  
+  if (pathClearForStreaming) {
+    // Step 3: Spin up the video stream if cleared
+    startCameraStream();
+  } else {
+    // Step 4: Revert component state safely if denied or timed out
+    feedbackMessage.value = 'Camera Access Denied. Camera permission is required to scan codes.';
+    feedbackStatus.value = 'error';
+    console.warn('-> [SCANNER] Aborted camera stream initialization due to negative permissions clearance.');
+  }
 });
 
 onBeforeUnmount(() => {
-  // 2. Crucial: Release hardware locks cleanly if user changes pages/tabs
   stopCameraStream();
 });
 
 const startCameraStream = async () => {
   try {
-    const config = { 
-      fps: 10, 
-      qrbox: { width: 250, height: 250 } 
-    };
+    const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+    
+    feedbackMessage.value = 'Connecting to hardware device webcam channels...';
+    feedbackStatus.value = 'warning';
 
-    // 3. Start hardware video capture tracking
-    await scannerInstance.start(
-      { facingMode: "environment" }, // Forces mobile rear camera layout
-      config,
-      onQrCodeDetected,
-      onScanTickFailure
-    );
+    // This call will trigger your updated MainActivity onPermissionRequest gate automatically and silently!
+    await scannerInstance.start({ facingMode: "environment" }, config, onQrCodeDetected, onScanTickFailure);
     
     feedbackMessage.value = 'Align the server QR code inside the bounding box.';
     feedbackStatus.value = '';
@@ -65,52 +280,23 @@ const startCameraStream = async () => {
   }
 };
 
-//const onQrCodeDetected = async (decodedText) => {
-//  try {
-//    // 4. Kill the active camera stream instantly to stop duplicate scan events
-//    await stopCameraStream();
-//
-//    // 5. Parse out your specific server payload string structure
-//    const configData = JSON.parse(decodedText);
-//    
-//    feedbackMessage.value = 'Configuration loaded successfully!';
-//    feedbackStatus.value = 'success';
-//
-//    // 6. Push the data package back up to your global store action listeners
-//    emit('configScanned', configData);
-//  } catch (err) {
-//    // The scanned code was not your specific JSON server format. Keep scanning!
-//    feedbackMessage.value = 'Invalid QR layout. Please scan a valid server setup code.';
-//    feedbackStatus.value = 'warning';
-//  }
-//};
 const onQrCodeDetected = async (decodedText) => {
-  console.log("► Hardware detected raw QR string:", decodedText);
-
-  // 1. STOP THE CAMERA IMMEDIATELY 
-  // Doing this first ensures the camera page doesn't hang if the data processing crashes.
+  console.log("Hardware detected raw QR string:", decodedText);
   await stopCameraStream();
-
   let payloadToEmit = null;
-
   try {
-    // 2. Try parsing it as a structured server JSON object
     payloadToEmit = JSON.parse(decodedText);
-    console.log("► Successfully parsed QR as JSON object:", payloadToEmit);
+    console.log("Successfully parsed QR as JSON object:", payloadToEmit);
   } catch (err) {
-    // 3. Fallback: If it's a raw string/URL instead of JSON, wrap it safely so it doesn't crash
-    console.warn("► QR text is not JSON. Falling back to plain text object mapping.");
+    console.warn("QR text is not JSON. Falling back to plain text object mapping.");
     payloadToEmit = { odataUrl: decodedText };
   }
-
-  // 4. FORCE THE EMIT TO THE PARENT
-  console.log("► Firing 'scanned' event to parent component now.");
+  console.log("Firing scanned event to parent component now.");
   emit('scanned', payloadToEmit);
 };
 
 const onScanTickFailure = (error) => {
-  // Triggers continuously on every video frame that does not contain a QR code.
-  // We keep this function entirely silent to preserve memory performance.
+  // Silent tick failures are expected during search frames cycles
 };
 
 const stopCameraStream = async () => {
@@ -128,6 +314,7 @@ const handleCancel = async () => {
   await stopCameraStream();
   emit('close');
 };
+
 </script>
 
 
