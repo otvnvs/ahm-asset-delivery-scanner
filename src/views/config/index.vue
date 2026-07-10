@@ -157,7 +157,7 @@
     </main>
 
     <!-- Full-Screen Interactive Overlay Panel -->
-    <div v-if="showQrCode" class="qr-overlay" @click="openScannerAction">
+    <div v-if="showQrCode" class="qr-overlay" @click="toggleQrCode">
       <div class="qr-modal-card">
         <div class="qr-wrapper">
           <QrCode :text="qrCodeValue" :size="260" color="#FFFFFF" />
