@@ -2,7 +2,6 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
-  <CustomDialog />
   
   <!-- 
     The exact hidden input field mapping from your working vanilla JS project.
@@ -21,7 +20,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import CustomDialog from './components/dialog/CustomDialog.vue';
 import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 import { store } from './util/store.js';
@@ -33,23 +31,6 @@ const scanCatcherRef = ref(null);
 let continuousFocusInterval = null;
 let nativeAlertRef = null;
 
-/**
- * Creates a clean iframe reference to grab an un-hijacked copy of 
- * native window.alert, bypassing the CustomDialog promise pipeline entirely.
- */
-const forceNativeSystemAlert = (message) => {
-  if (!nativeAlertRef) {
-    try {
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      nativeAlertRef = iframe.contentWindow.alert;
-    } catch (e) {
-      nativeAlertRef = window.alert; // Fallback
-    }
-  }
-  nativeAlertRef(message);
-};
 
 const isTargetInputFocused = () => {
   if (isWebcamScannerOpen.value) return true;
