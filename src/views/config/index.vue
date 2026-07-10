@@ -184,6 +184,7 @@ import QrCode from '../../components/qrcode/generator/index.vue';
 import QrCodeScanner from '../../components/qrcode/scanner/index.vue';
 import { store, storeActions } from '../../util/store.js';
 import { testODataConnection } from '../../util/odata.js';
+import { isWebcamScannerOpen } from '../../util/barcodeScanner.js';
 
 const router = useRouter();
 const saveSuccess = ref(false);
@@ -191,9 +192,9 @@ const isTesting = ref(false);
 const testResult = ref(null);
 const showQrCode = ref(false);
 const isQrScannerOpen = ref(false);
-const closeScanner = () => {
-	isQrScannerOpen.value = false;
-};
+//const closeScanner = () => {
+//	isQrScannerOpen.value = false;
+//};
 //const handleScan = (scanData) => {
 //  console.log("Applying scanned parameters to local config form:", scanData);
 //
@@ -215,6 +216,35 @@ const closeScanner = () => {
 //  isQrScannerOpen.value = false;
 //};
 // 3. Update handleScan to read new fields from QR
+//const handleScan = (scanData) => {
+//  if (scanData) {
+//    if (scanData.baseHost) localConfig.value.baseHost = scanData.baseHost;
+//    if (scanData.poPath) localConfig.value.poPath = scanData.poPath;
+//    if (scanData.grPath) localConfig.value.grPath = scanData.grPath;
+//    if (scanData.username) localConfig.value.username = scanData.username;
+//    if (scanData.password) localConfig.value.password = scanData.password;
+//    if (scanData.networkTimeoutMs) localConfig.value.networkTimeoutMs = Number(scanData.networkTimeoutMs);
+//    if (scanData.sapClient) localConfig.value.sapClient = String(scanData.sapClient);
+//    if (typeof scanData.useDummyData !== 'undefined') {
+//      localConfig.value.useDummyData = !!scanData.useDummyData;
+//    }
+//  }
+//  isQrScannerOpen.value = false;
+//};
+
+// Update your open scanner logic:
+const openScannerAction = () => {
+  isWebcamScannerOpen.value = true;
+  isQrScannerOpen.value = true;
+};
+
+// Update your existing close scanner function:
+const closeScanner = () => {
+  isWebcamScannerOpen.value = false;
+  isQrScannerOpen.value = false;
+};
+
+// Update your existing handleScan success callback:
 const handleScan = (scanData) => {
   if (scanData) {
     if (scanData.baseHost) localConfig.value.baseHost = scanData.baseHost;
@@ -228,6 +258,9 @@ const handleScan = (scanData) => {
       localConfig.value.useDummyData = !!scanData.useDummyData;
     }
   }
+  
+  // Release focus control back to the global guardian component
+  isWebcamScannerOpen.value = false;
   isQrScannerOpen.value = false;
 };
 
