@@ -2,26 +2,54 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
+  
+  <!-- 
+    The exact physical input tag structure from your working vanilla JS project.
+    Placed side-by-side with router-view to ensure it never drops out of the DOM.
+  -->
+  <input
+    id="hardwareScanCatcher"
+    ref="scanCatcherRef"
+    type="text"
+    class="zebra-hidden-guardian"
+    autocomplete="off"
+    @keydown="handleHardwareWedgeInput"
+  />
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 import { store } from './util/store.js';
 
 const route = useRoute();
 const router = useRouter();
+const scanCatcherRef = ref(null);
 
-// Dedicated local memory buffers to assemble high-speed incoming key strings
-let keystrokeBuffer = '';
-let lastKeyTimestamp = 0;
+let continuousFocusInterval = null;
+let trueSystemAlertRef = null;
 
 /**
- * Checks if the picker is intentionally typing inside a real manual form field
- * or setting up application configurations so we do not disrupt text input.
+ * Creates a clean iframe reference to grab an un-hijacked copy of 
+ * native window.alert, completely bypassing the CustomDialog promise timeline.
  */
-const isUserManuallyEditing = () => {
+const forceNativeAlertPopup = (messageText) => {
+  if (!trueSystemAlertRef) {
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      trueSystemAlertRef = iframe.contentWindow.alert;
+    } catch (e) {
+      trueSystemAlertRef = window.alert; // Fallback
+    }
+  }
+  trueSystemAlertRef(messageText);
+};
+
+const isTargetInputFocused = () => {
   if (isWebcamScannerOpen.value) return true; // Camera QR stream pass
 
   const activeEl = document.activeElement;
@@ -29,52 +57,45 @@ const isUserManuallyEditing = () => {
 
   const tagName = activeEl.tagName.toLowerCase();
   
-  // Whitelisted user-editable text entry components
+  // Whitelisted text field markers from your manual configuration pages
   const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
 
   if (interactiveInputs.includes(activeEl.id) || 
       activeEl.className?.includes('form-input') || 
       tagName === 'textarea' || 
-      tagName === 'select') {
+      activeEl.id === 'hardwareScanCatcher') {
     return true;
   }
   return false;
 };
 
-const handleGlobalKeystrokeCapture = (event) => {
-  // Rule 1: Abort if the user has focused a visible input field to type manually
-  if (isUserManuallyEditing()) {
+const reclaimScannerFocus = () => {
+  if (!isTargetInputFocused()) {
+    if (scanCatcherRef.value) {
+      scanCatcherRef.value.focus();
+    }
+  }
+};
+
+const handleWindowTapReclaim = (event) => {
+  if (event.target && event.target.tagName.toLowerCase() === 'input') {
     return;
   }
+  setTimeout(reclaimScannerFocus, 40);
+};
 
-  const now = Date.now();
-
-  // Reset the buffer if the time gap since the last keystroke is too long.
-  // Hardware lasers in keyboard mode stream characters nearly instantly (typically under 15ms per character).
-  // If a picker types by hand with large delays, this protects application states.
-  if (now - lastKeyTimestamp > 200) {
-    keystrokeBuffer = '';
-  }
-  lastKeyTimestamp = now;
-
-  // Rule 2: Capture completion when the laser fires the terminating Enter command sequence
+const handleHardwareWedgeInput = (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    const finalizedBarcode = keystrokeBuffer.trim();
-    keystrokeBuffer = ''; // Flush immediate buffer
+    const rawScanString = scanCatcherRef.value.value.trim();
+    scanCatcherRef.value.value = ''; // Flush immediately for subsequent rapid box scans
 
-    if (finalizedBarcode) {
-      // 🚨 STANDARD NATIVE BROWSER ALERT POPUP 🚨
-      alert(`[ZEBRA WEDGED DETECTED]\nData: "${finalizedBarcode}"\nActive View Screen: ${route.path}`);
+    if (!rawScanString) return;
 
-      processScannedBarcode(finalizedBarcode);
-    }
-    return;
-  }
+    // 🚨 FORCED TRUE NATIVE WEBVIEW SYSTEM DIALOG POPUP 🚨
+    forceNativeAlertPopup(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
 
-  // Rule 3: Append raw single alphanumeric characters, ignoring control keys (Shift, CapsLock, Alt)
-  if (event.key.length === 1) {
-    keystrokeBuffer += event.key;
+    processScannedBarcode(rawScanString);
   }
 };
 
@@ -107,21 +128,45 @@ const processScannedBarcode = (barcodeString) => {
   }
 };
 
+watch(() => route.path, () => {
+  setTimeout(reclaimScannerFocus, 80);
+});
+
 onMounted(() => {
-  // Listen directly on the root window node using capturing mode (true)
-  window.addEventListener('keydown', handleGlobalKeystrokeCapture, true);
+alert("mounted");
+  // Safe initialization of your dialog overrides layer
+  initWindowOverrides();
+
+  if (scanCatcherRef.value) {
+    // Port both attributes to ensure the Android WebKit context locks soft layouts down
+    scanCatcherRef.value.inputMode = 'none';
+    scanCatcherRef.value.setAttribute('inputmode', 'none');
+  }
+
+  reclaimScannerFocus();
+
+  window.addEventListener('click', handleWindowTapReclaim, true);
+  continuousFocusInterval = setInterval(reclaimScannerFocus, 1000);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('keydown', handleGlobalKeystrokeCapture, true);
+  window.removeEventListener('click', handleWindowTapReclaim, true);
+  if (continuousFocusInterval) clearInterval(continuousFocusInterval);
 });
 </script>
 
 <style>
-/* Clean layouts wrapper */
-.minimal-container {
-  width: 100%;
-  box-sizing: border-box;
+.zebra-hidden-guardian {
+  position: fixed !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  left: -999px !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  z-index: -999999 !important;
+  background: transparent !important;
+  border: none !important;
 }
 </style>
 
