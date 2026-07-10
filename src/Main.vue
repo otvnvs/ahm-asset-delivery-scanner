@@ -4,6 +4,7 @@
     <!--<RefreshButton />-->
   </div>
   <CustomDialog />
+  <BarcodeGuardian />
 </template>
 
 <script setup>
@@ -11,6 +12,7 @@ import { onMounted, onUnmounted, ref } from 'vue';
 
 //import RefreshButton from './components/refreshbutton/RefreshButton.vue';
 import CustomDialog from './components/dialog/CustomDialog.vue';
+import BarcodeGuardian from './components/scanner/BarcodeGuardian.vue';
 import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { sendWorkerMessage, listenForWorkerMessages } from './util/serviceWorker/serviceWorker.js';
 
@@ -36,6 +38,7 @@ function triggerWorkerPing() {
 onMounted(() => {
   initWindowOverrides();
   listenForWorkerMessages(handleIncomingWorkerData);
+  initWindowOverrides();
 });
 
 

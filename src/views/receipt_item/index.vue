@@ -292,16 +292,27 @@ const flags = ref({
  * Computed Reference Core:
  * Looks up the correct array record envelope from store memory matching the article code query parameter
  */
+//const activeItem = computed(() => {
+//  const cachedData = store.cache.entityLists['ActiveDelivery'];
+//  if (!cachedData) return null;
+//  
+//  // Safely grab the first matched document frame from the lookup array container
+//  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+//  if (!activeDoc || !activeDoc.items) return null;
+//
+//  return activeDoc.items.find(item => item.code === targetArticleCode.value) || null;
+//});
+// This section inside your views/receipt_item/index.vue is already perfect:
 const activeItem = computed(() => {
   const cachedData = store.cache.entityLists['ActiveDelivery'];
   if (!cachedData) return null;
-  
-  // Safely grab the first matched document frame from the lookup array container
   const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
   if (!activeDoc || !activeDoc.items) return null;
-
+  
+  // Reactively updates the view parameters whenever this item changes
   return activeDoc.items.find(item => item.code === targetArticleCode.value) || null;
 });
+
 
 // Seed current captured values from persistent store cache memory onto form controls layout on load
 onMounted(() => {
