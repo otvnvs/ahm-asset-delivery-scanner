@@ -2,11 +2,11 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
+  <CustomDialog />
   
   <!-- 
-    The exact physical input tag structure that worked in your vanilla project.
-    By rendering it inside Main.vue alongside the top-level router-view container,
-    it remains safely mounted across all route jumps.
+    The exact hidden input field mapping from your working vanilla JS project.
+    Placed side-by-side with router-view so it never drops out of the DOM.
   -->
   <input
     id="hardwareScanCatcher"
@@ -21,6 +21,7 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import CustomDialog from './components/dialog/CustomDialog.vue';
 import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 import { store } from './util/store.js';
@@ -30,20 +31,33 @@ const router = useRouter();
 const scanCatcherRef = ref(null);
 
 let continuousFocusInterval = null;
+let nativeAlertRef = null;
 
 /**
- * Checks if the picker is actively entering alphanumeric values into a form group
- * or configuring server connections so we don't disrupt text layouts.
+ * Creates a clean iframe reference to grab an un-hijacked copy of 
+ * native window.alert, bypassing the CustomDialog promise pipeline entirely.
  */
+const forceNativeSystemAlert = (message) => {
+  if (!nativeAlertRef) {
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+      nativeAlertRef = iframe.contentWindow.alert;
+    } catch (e) {
+      nativeAlertRef = window.alert; // Fallback
+    }
+  }
+  nativeAlertRef(message);
+};
+
 const isTargetInputFocused = () => {
-  if (isWebcamScannerOpen.value) return true; // Yield to camera matrix
+  if (isWebcamScannerOpen.value) return true;
 
   const activeEl = document.activeElement;
   if (!activeEl) return false;
 
   const tagName = activeEl.tagName.toLowerCase();
-  
-  // Whitelisted text element selectors from your manual config/registration setups
   const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
 
   if (interactiveInputs.includes(activeEl.id) || 
@@ -63,9 +77,7 @@ const reclaimScannerFocus = () => {
   }
 };
 
-// Global click delegation loop matching your old project architecture exactly
 const handleWindowTapReclaim = (event) => {
-  // If clicking an input target row directly, let focus transition natively
   if (event.target && event.target.tagName.toLowerCase() === 'input') {
     return;
   }
@@ -76,19 +88,18 @@ const handleHardwareWedgeInput = (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
     const rawScanString = scanCatcherRef.value.value.trim();
-    scanCatcherRef.value.value = ''; // Flush immediately for subsequent rapid box scans
+    scanCatcherRef.value.value = ''; // Instantly clear buffer for next scan
 
     if (!rawScanString) return;
 
-    // 🚨 NATIVE TELEMETRY DIAGNOSTIC ALERT 🚨
-    alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
+    // 🚨 FORCED TRUE NATIVE WEBVIEW SYSTEM DIALOG POPUP 🚨
+    forceNativeSystemAlert(`[ZEBRA HARDWARE WEDGED]\nData: "${rawScanString}"\nRoute Path: ${route.path}`);
 
     processScannedBarcode(rawScanString);
   }
 };
 
 const processScannedBarcode = (barcodeString) => {
-  // If scanning while on the registration view, pop it inside the input target field
   if (route.path === '/register_delivery') {
     const deliveryInput = document.querySelector('input[placeholder*="PO, STO, DC"]');
     if (deliveryInput) {
@@ -98,23 +109,18 @@ const processScannedBarcode = (barcodeString) => {
     return;
   }
 
-  // Look up item context rows from active deliveries list memory cache
   const cachedData = store.cache.entityLists['ActiveDelivery'];
   if (!cachedData) return;
   
   const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
   if (!activeDoc || !activeDoc.items) return;
 
-  // Match the laser data string parameter to our active data row array models
   const matchedItem = activeDoc.items.find(item => {
     return item.code === barcodeString || item.vendorId === barcodeString;
   });
 
   if (matchedItem) {
-    // Increment the captured receipt item quantities count
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
-
-    // Direct programmatic shift to your destination layout view screen
     router.push({
       path: '/receipt_item',
       query: { articleCode: matchedItem.code }
@@ -122,7 +128,6 @@ const processScannedBarcode = (barcodeString) => {
   }
 };
 
-// Reclaim scanner cursor position instantly when cross-screen transitions happen
 watch(() => route.path, () => {
   setTimeout(reclaimScannerFocus, 80);
 });
@@ -131,17 +136,12 @@ onMounted(() => {
   initWindowOverrides();
 
   if (scanCatcherRef.value) {
-    // Port both attributes to make sure the Android WebKit context locks soft layouts down
     scanCatcherRef.value.inputMode = 'none';
     scanCatcherRef.value.setAttribute('inputmode', 'none');
   }
 
   reclaimScannerFocus();
-
-  // Attach global operational events directly to window root nodes
   window.addEventListener('click', handleWindowTapReclaim, true);
-  
-  // Continuous 1-second focus stabilization safety loop check
   continuousFocusInterval = setInterval(reclaimScannerFocus, 1000);
 });
 
@@ -152,10 +152,6 @@ onUnmounted(() => {
 </script>
 
 <style>
-/* 
-  Global styles mapping to your old project's CSS parameters.
-  This positions the element safely off-screen.
-*/
 .zebra-hidden-guardian {
   position: fixed !important;
   opacity: 0 !important;
