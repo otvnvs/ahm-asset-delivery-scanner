@@ -1,99 +1,120 @@
 <template>
-  <!-- Completely headless carrier. We match your vanilla layout exactly -->
-  <div class="zebra-headless-carrier" aria-hidden="true"></div>
+  <div class="minimal-container">
+    <router-view></router-view>
+  </div>
+  
+  <!-- 
+    The exact physical input tag structure that worked in your vanilla project.
+    By rendering it inside Main.vue alongside the top-level router-view container,
+    it remains safely mounted across all route jumps.
+  -->
+  <input
+    id="hardwareScanCatcher"
+    ref="scanCatcherRef"
+    type="text"
+    class="zebra-hidden-guardian"
+    autocomplete="off"
+    @keydown="handleHardwareWedgeInput"
+  />
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { store } from '../../util/store.js';
-import { isWebcamScannerOpen } from '../../util/barcodeScanner.js';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { initWindowOverrides } from './components/dialog/useDialog.js';
+import { isWebcamScannerOpen } from './util/barcodeScanner.js';
+import { store } from './util/store.js';
 
-const router = useRouter();
 const route = useRoute();
+const router = useRouter();
+const scanCatcherRef = ref(null);
 
-// Maintain a stable persistent reference to the native DOM node
-let scanCatcher = null;
+let continuousFocusInterval = null;
 
-const reclaimScannerFocus = () => {
-  // Respect active webcam scan streams or configuration fields
-  if (isWebcamScannerOpen.value) return;
+/**
+ * Checks if the picker is actively entering alphanumeric values into a form group
+ * or configuring server connections so we don't disrupt text layouts.
+ */
+const isTargetInputFocused = () => {
+  if (isWebcamScannerOpen.value) return true; // Yield to camera matrix
 
   const activeEl = document.activeElement;
-  
-  // Whitelisted manual fields from your new Vue project forms where focus shouldn't be stolen
-  const interactiveInputTags = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
-  
-  if (activeEl) {
-    const tagName = activeEl.tagName.toLowerCase();
-    
-    // Check custom component IDs or standard form fields
-    if (interactiveInputTags.includes(activeEl.id) || 
-        activeEl.className?.includes('form-input') || 
-        tagName === 'textarea' || 
-        activeEl.id === 'hardwareScanCatcher') {
-      return; // Safe pass for manual typing
-    }
-  }
+  if (!activeEl) return false;
 
-  // Force programmatic focus onto our hardware wedge target receiver input
-  if (scanCatcher) {
-    scanCatcher.focus();
+  const tagName = activeEl.tagName.toLowerCase();
+  
+  // Whitelisted text element selectors from your manual config/registration setups
+  const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
+
+  if (interactiveInputs.includes(activeEl.id) || 
+      activeEl.className?.includes('form-input') || 
+      tagName === 'textarea' || 
+      activeEl.id === 'hardwareScanCatcher') {
+    return true;
+  }
+  return false;
+};
+
+const reclaimScannerFocus = () => {
+  if (!isTargetInputFocused()) {
+    if (scanCatcherRef.value) {
+      scanCatcherRef.value.focus();
+    }
   }
 };
 
-const handleGlobalClick = (event) => {
-  // If the worker taps a configuration entry, let the thread process focus, then reclaim
+// Global click delegation loop matching your old project architecture exactly
+const handleWindowTapReclaim = (event) => {
+  // If clicking an input target row directly, let focus transition natively
   if (event.target && event.target.tagName.toLowerCase() === 'input') {
     return;
   }
-  setTimeout(reclaimScannerFocus, 50);
+  setTimeout(reclaimScannerFocus, 40);
 };
 
-const handleKeyDown = (event) => {
+const handleHardwareWedgeInput = (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    const rawScanString = scanCatcher.value.trim();
-    scanCatcher.value = ''; // Instantly flush character buffer
+    const rawScanString = scanCatcherRef.value.value.trim();
+    scanCatcherRef.value.value = ''; // Flush immediately for subsequent rapid box scans
 
     if (!rawScanString) return;
 
-    // 🚨 DIAGNOSTIC TELEMETRY ALERT MATCHING YOUR REQ 🚨
-    alert(`[ZEBRA HARDWARE CAPTURED]\nScanned String: "${rawScanString}"\nCurrent Vue Route: ${route.path}`);
+    // 🚨 NATIVE TELEMETRY DIAGNOSTIC ALERT 🚨
+    alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
 
-    processScannedPayload(rawScanString);
+    processScannedBarcode(rawScanString);
   }
 };
 
-const processScannedPayload = (barcode) => {
-  // Rule 1: Handle delivery registration screens exactly as your vanilla project did
+const processScannedBarcode = (barcodeString) => {
+  // If scanning while on the registration view, pop it inside the input target field
   if (route.path === '/register_delivery') {
     const deliveryInput = document.querySelector('input[placeholder*="PO, STO, DC"]');
     if (deliveryInput) {
-      deliveryInput.value = barcode;
-      // Dispatch standard input change events so Vue's internal reactive trackers accept the change
+      deliveryInput.value = barcodeString;
       deliveryInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
     return;
   }
 
-  // Rule 2: Inspect active delivery datasets
+  // Look up item context rows from active deliveries list memory cache
   const cachedData = store.cache.entityLists['ActiveDelivery'];
   if (!cachedData) return;
   
   const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
   if (!activeDoc || !activeDoc.items) return;
 
-  // Search items comparing with code fields or normalized Vendor EAN strings (CartonEAN attributes)
+  // Match the laser data string parameter to our active data row array models
   const matchedItem = activeDoc.items.find(item => {
-    return item.code === barcode || item.vendorId === barcode;
+    return item.code === barcodeString || item.vendorId === barcodeString;
   });
 
   if (matchedItem) {
-    // Increment product selection line item counter
+    // Increment the captured receipt item quantities count
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
 
-    // Move view path straight onto your destination screen layout view
+    // Direct programmatic shift to your destination layout view screen
     router.push({
       path: '/receipt_item',
       query: { articleCode: matchedItem.code }
@@ -101,57 +122,51 @@ const processScannedPayload = (barcode) => {
   }
 };
 
-// Re-evaluate focus targets instantly during cross-view transition sweeps
+// Reclaim scanner cursor position instantly when cross-screen transitions happen
 watch(() => route.path, () => {
-  setTimeout(reclaimScannerFocus, 100);
+  setTimeout(reclaimScannerFocus, 80);
 });
 
 onMounted(() => {
-  // Programmatically construct and append the element exactly as your vanilla JS project did
-  scanCatcher = document.createElement('input');
-  scanCatcher.type = 'text';
-  scanCatcher.id = 'hardwareScanCatcher';
-  
-  // Set properties both programmatically and via attribute descriptors for broad WebKit compatibility
-  scanCatcher.inputMode = 'none';
-  scanCatcher.setAttribute('inputmode', 'none');
-  
-  // Match your working vanilla CSS parameters exactly
-  scanCatcher.style.position = 'fixed';
-  scanCatcher.style.opacity = '0';
-  scanCatcher.style.pointerEvents = 'none';
-  scanCatcher.style.left = '-999px';
-  scanCatcher.style.top = '0';
-  scanCatcher.style.width = '1px';
-  scanCatcher.style.height = '1px';
-  scanCatcher.style.zIndex = '-99999';
+  initWindowOverrides();
 
-  document.body.appendChild(scanCatcher);
-  
-  // Bind listeners
-  scanCatcher.addEventListener('keydown', handleKeyDown);
-  document.addEventListener('click', handleGlobalClick, true);
+  if (scanCatcherRef.value) {
+    // Port both attributes to make sure the Android WebKit context locks soft layouts down
+    scanCatcherRef.value.inputMode = 'none';
+    scanCatcherRef.value.setAttribute('inputmode', 'none');
+  }
 
   reclaimScannerFocus();
 
-  // Unified background synchronization fallback loop tracker
-  window.zebraFocusLoop = setInterval(reclaimScannerFocus, 1000);
+  // Attach global operational events directly to window root nodes
+  window.addEventListener('click', handleWindowTapReclaim, true);
+  
+  // Continuous 1-second focus stabilization safety loop check
+  continuousFocusInterval = setInterval(reclaimScannerFocus, 1000);
 });
 
 onUnmounted(() => {
-  // Clean up references cleanly during hot-reload iterations
-  if (scanCatcher && document.body.contains(scanCatcher)) {
-    scanCatcher.removeEventListener('keydown', handleKeyDown);
-    document.body.removeChild(scanCatcher);
-  }
-  document.removeEventListener('click', handleGlobalClick, true);
-  if (window.zebraFocusLoop) clearInterval(window.zebraFocusLoop);
+  window.removeEventListener('click', handleWindowTapReclaim, true);
+  if (continuousFocusInterval) clearInterval(continuousFocusInterval);
 });
 </script>
 
-<style scoped>
-.zebra-headless-carrier {
-  display: none;
+<style>
+/* 
+  Global styles mapping to your old project's CSS parameters.
+  This positions the element safely off-screen.
+*/
+.zebra-hidden-guardian {
+  position: fixed !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  left: -999px !important;
+  top: 0 !important;
+  width: 1px !important;
+  height: 1px !important;
+  z-index: -999999 !important;
+  background: transparent !important;
+  border: none !important;
 }
 </style>
 
