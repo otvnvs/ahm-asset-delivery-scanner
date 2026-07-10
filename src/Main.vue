@@ -127,20 +127,23 @@ const processScannedBarcode = (barcodeString) => {
   });
 
   if (matchedItem) {
-    // 1. Directly increment the target element row property in our reactive storage
+    // 1. Directly increment the target element row data counter
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
 
-    // 2. Force an immediate reactive screen update loop by appending a dynamic scan timestamp.
-    // This unique token tricks vue-router into realizing the route state has updated,
-    // which instantly triggers your sub-page watchers and forces the counter numbers 
-    // to step up continuously on the user canvas view in real-time.
-    router.push({
-      path: '/receipt_item',
-      query: { 
-        articleCode: matchedItem.code,
-        _scan_ts: Date.now() // Unique execution seed parameter
-      }
-    });
+    // 2. Broadcast a global notification down to the DOM layer.
+    // If the picker is currently resting on the receipt view screen, 
+    // this event will bypass the router entirely and update the numbers live!
+    window.dispatchEvent(new CustomEvent('zebra-hardware-scan-completed', {
+      detail: { articleCode: matchedItem.code, newQty: matchedItem.recptQty }
+    }));
+
+    // 3. Keep the backup routing command intact for initial page warp transitions
+    if (route.path !== '/receipt_item' || route.query.articleCode !== matchedItem.code) {
+      router.push({
+        path: '/receipt_item',
+        query: { articleCode: matchedItem.code }
+      });
+    }
   }
 };
 

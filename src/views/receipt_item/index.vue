@@ -270,7 +270,11 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
+//import { ref, computed, onMounted, watch } from 'vue';
+//import { useRouter, useRoute } from 'vue-router';
+//import MenuTop from '../../components/menutop/index.vue';
+//import { store } from '../../util/store.js';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
 import { store } from '../../util/store.js';
@@ -278,9 +282,10 @@ import { store } from '../../util/store.js';
 const router = useRouter();
 const route = useRoute();
 
-// Capture targeted query parameter from route address links
-const targetArticleCode = ref(route.query.articleCode || '');
+// Reactively grab the article identifier code from the routing link query mapping
+const targetArticleCode = computed(() => route.query.articleCode || '');
 
+// Local form element reference input tracking state models
 const quantity = ref(0);
 const flags = ref({
   damages: false,
@@ -288,68 +293,38 @@ const flags = ref({
   invalidBarcode: false
 });
 
-// This watcher keeps your on-screen inputs synchronized with background laser scans!
-watch(
-  () => activeItem.value?.recptQty,
-  (newQty) => {
-    if (newQty !== undefined) {
-      quantity.value = newQty;
-    }
-  },
-  { immediate: true } // Hydrate the value instantly on initial view navigation
-);
-
-// Do the same for your configuration flags to ensure smooth data persistence
-watch(
-  () => activeItem.value?.flags,
-  (newFlags) => {
-    if (newFlags) {
-      flags.value.damages = !!newFlags.damages;
-      flags.value.noBarcode = !!newFlags.noBarcode;
-      flags.value.invalidBarcode = !!newFlags.invalidBarcode;
-    }
-  },
-  { immediate: true, deep: true }
-);
-
-/**
- * Computed Reference Core:
- * Looks up the correct array record envelope from store memory matching the article code query parameter
- */
-//const activeItem = computed(() => {
-//  const cachedData = store.cache.entityLists['ActiveDelivery'];
-//  if (!cachedData) return null;
-//  
-//  // Safely grab the first matched document frame from the lookup array container
-//  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
-//  if (!activeDoc || !activeDoc.items) return null;
-//
-//  return activeDoc.items.find(item => item.code === targetArticleCode.value) || null;
-//});
-// This section inside your views/receipt_item/index.vue is already perfect:
+// Reactively link component boundaries to our shared data store payload list matrix collection
 const activeItem = computed(() => {
   const cachedData = store.cache.entityLists['ActiveDelivery'];
   if (!cachedData) return null;
-  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
   if (!activeDoc || !activeDoc.items) return null;
-  
-  // Reactively updates the view parameters whenever this item changes
   return activeDoc.items.find(item => item.code === targetArticleCode.value) || null;
 });
 
-
-// Seed current captured values from persistent store cache memory onto form controls layout on load
-onMounted(() => {
-  if (activeItem.value) {
-    quantity.value = activeItem.value.recptQty || 0;
-    if (activeItem.value.flags) {
-      flags.value.damages = !!activeItem.value.flags.damages;
-      flags.value.noBarcode = !!activeItem.value.flags.noBarcode;
-      flags.value.invalidBarcode = !!activeItem.value.flags.invalidBarcode;
+/**
+ * Event Interceptor Callback
+ * Catches the direct programmatic broadcast emitted by Main.vue.
+ * If the laser targets the item currently displayed, it updates the visual state live.
+ */
+const handleHardwareLaserBroadcast = (event) => {
+  const { articleCode, newQty } = event.detail;
+  
+  if (articleCode === targetArticleCode.value) {
+    console.log(`[RECEIPT SCREEN EVENT] Continuous scan captured for ${articleCode}. New Qty: ${newQty}`);
+    
+    // 1. Instantly increment the local reactive model variable 
+    quantity.value = newQty;
+    
+    // 2. Direct vanilla DOM baseline sync check fallback layer to force layout rendering updates
+    const nativeCounterLabel = document.getElementById('lblCapturedQty');
+    if (nativeCounterLabel) {
+      nativeCounterLabel.textContent = newQty;
     }
   }
-});
+};
 
+// Standard manual button quantitative offset adjustments step calculation modules
 const adjustQty = (amount) => {
   quantity.value = Math.max(0, quantity.value + amount);
 };
@@ -362,23 +337,40 @@ const handleClear = () => {
   flags.value.invalidBarcode = false;
 };
 
-// Directly writes edited parameters back down to your reactive localStorage cache layer reference
 const handleSave = () => {
   if (!activeItem.value) return;
-
   console.log(`[STORE WRITE] Committing quantities back onto product row cache target: ${activeItem.value.code}`);
-
-  // Mutates store properties inside memory; deep-watch auto-triggers localStorage disk backup serialization sequence
+  
+  // Persist local state arrays back onto our unified global storage schema records
   activeItem.value.recptQty = parseInt(quantity.value, 10) || 0;
   activeItem.value.flags = {
     damages: !!flags.value.damages,
     noBarcode: !!flags.value.noBarcode,
     invalidBarcode: !!flags.value.invalidBarcode
   };
-
-  // Return user back to PO Items summary table checklist screen track cleanly
+  
   router.push('/po_items');
 };
+
+onMounted(() => {
+  // Hydrate local layout trackers cleanly when first loading or landing on the page
+  if (activeItem.value) {
+    quantity.value = activeItem.value.recptQty || 0;
+    if (activeItem.value.flags) {
+      flags.value.damages = !!activeItem.value.flags.damages;
+      flags.value.noBarcode = !!activeItem.value.flags.noBarcode;
+      flags.value.invalidBarcode = !!activeItem.value.flags.invalidBarcode;
+    }
+  }
+
+  // Bind the high-speed event channel listener straight to the global window context root node
+  window.addEventListener('zebra-hardware-scan-completed', handleHardwareLaserBroadcast);
+});
+
+onUnmounted(() => {
+  // Disconnect the messaging pipelines cleanly to eliminate background thread leakage
+  window.removeEventListener('zebra-hardware-scan-completed', handleHardwareLaserBroadcast);
+});
 </script>
 
 
