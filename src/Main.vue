@@ -3,10 +3,6 @@
     <router-view></router-view>
   </div>
   
-  <!-- 
-    The exact physical input tag structure from your working vanilla JS project.
-    Placed side-by-side with router-view to ensure it never drops out of the DOM.
-  -->
   <input
     id="hardwareScanCatcher"
     ref="scanCatcherRef"
@@ -14,6 +10,7 @@
     class="zebra-hidden-guardian"
     autocomplete="off"
     @keydown="handleHardwareWedgeInput"
+    @input="handleDataInjected"
   />
 </template>
 
@@ -29,35 +26,15 @@ const router = useRouter();
 const scanCatcherRef = ref(null);
 
 let continuousFocusInterval = null;
-let trueSystemAlertRef = null;
-
-/**
- * Creates a clean iframe reference to grab an un-hijacked copy of 
- * native window.alert, completely bypassing the CustomDialog promise timeline.
- */
-const forceNativeAlertPopup = (messageText) => {
-  if (!trueSystemAlertRef) {
-    try {
-      const iframe = document.createElement('iframe');
-      iframe.style.display = 'none';
-      document.body.appendChild(iframe);
-      trueSystemAlertRef = iframe.contentWindow.alert;
-    } catch (e) {
-      trueSystemAlertRef = window.alert; // Fallback
-    }
-  }
-  trueSystemAlertRef(messageText);
-};
+let inputDebounceTimeout = null;
 
 const isTargetInputFocused = () => {
-  if (isWebcamScannerOpen.value) return true; // Camera QR stream pass
+  if (isWebcamScannerOpen.value) return true;
 
   const activeEl = document.activeElement;
   if (!activeEl) return false;
 
   const tagName = activeEl.tagName.toLowerCase();
-  
-  // Whitelisted text field markers from your manual configuration pages
   const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
 
   if (interactiveInputs.includes(activeEl.id) || 
@@ -84,19 +61,36 @@ const handleWindowTapReclaim = (event) => {
   setTimeout(reclaimScannerFocus, 40);
 };
 
+// Channel 1: Catch high-speed Zebra scanner triggers with terminating Enter codes
 const handleHardwareWedgeInput = (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    const rawScanString = scanCatcherRef.value.value.trim();
-    scanCatcherRef.value.value = ''; // Flush immediately for subsequent rapid box scans
-
-    if (!rawScanString) return;
-
-    // 🚨 FORCED TRUE NATIVE WEBVIEW SYSTEM DIALOG POPUP 🚨
-    forceNativeAlertPopup(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
-
-    processScannedBarcode(rawScanString);
+    evaluateAndRouteCapturedBuffer();
   }
+};
+
+// Channel 2: Catch manual Samsung speed-typing tests that don't include Enter keys
+const handleDataInjected = () => {
+  if (inputDebounceTimeout) clearTimeout(inputDebounceTimeout);
+
+  // When typing manually, wait 400ms after the last character is struck to process it automatically
+  inputDebounceTimeout = setTimeout(() => {
+    evaluateAndRouteCapturedBuffer();
+  }, 400);
+};
+
+const evaluateAndRouteCapturedBuffer = () => {
+  if (!scanCatcherRef.value) return;
+
+  const rawScanString = scanCatcherRef.value.value.trim();
+  scanCatcherRef.value.value = ''; // Flush immediately for subsequent rapid box scans
+
+  if (!rawScanString) return;
+
+  // This alert will now pop open successfully!
+  alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
+
+  processScannedBarcode(rawScanString);
 };
 
 const processScannedBarcode = (barcodeString) => {
@@ -133,12 +127,9 @@ watch(() => route.path, () => {
 });
 
 onMounted(() => {
-alert("mounted");
-  // Safe initialization of your dialog overrides layer
   initWindowOverrides();
 
   if (scanCatcherRef.value) {
-    // Port both attributes to ensure the Android WebKit context locks soft layouts down
     scanCatcherRef.value.inputMode = 'none';
     scanCatcherRef.value.setAttribute('inputmode', 'none');
   }
@@ -152,6 +143,7 @@ alert("mounted");
 onUnmounted(() => {
   window.removeEventListener('click', handleWindowTapReclaim, true);
   if (continuousFocusInterval) clearInterval(continuousFocusInterval);
+  if (inputDebounceTimeout) clearTimeout(inputDebounceTimeout);
 });
 </script>
 
