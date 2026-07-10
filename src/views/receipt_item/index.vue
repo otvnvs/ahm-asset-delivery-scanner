@@ -270,7 +270,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import MenuTop from '../../components/menutop/index.vue';
 import { store } from '../../util/store.js';
@@ -287,6 +287,30 @@ const flags = ref({
   noBarcode: false,
   invalidBarcode: false
 });
+
+// This watcher keeps your on-screen inputs synchronized with background laser scans!
+watch(
+  () => activeItem.value?.recptQty,
+  (newQty) => {
+    if (newQty !== undefined) {
+      quantity.value = newQty;
+    }
+  },
+  { immediate: true } // Hydrate the value instantly on initial view navigation
+);
+
+// Do the same for your configuration flags to ensure smooth data persistence
+watch(
+  () => activeItem.value?.flags,
+  (newFlags) => {
+    if (newFlags) {
+      flags.value.damages = !!newFlags.damages;
+      flags.value.noBarcode = !!newFlags.noBarcode;
+      flags.value.invalidBarcode = !!newFlags.invalidBarcode;
+    }
+  },
+  { immediate: true, deep: true }
+);
 
 /**
  * Computed Reference Core:
