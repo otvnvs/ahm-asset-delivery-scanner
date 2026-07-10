@@ -2,7 +2,6 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
-  <CustomDialog />
   
   <!-- 
     The exact physical input tag structure that worked in your vanilla project.
@@ -22,8 +21,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import CustomDialog from './components/dialog/CustomDialog.vue';
-import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 import { store } from './util/store.js';
 
