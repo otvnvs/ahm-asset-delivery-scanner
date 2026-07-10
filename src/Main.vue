@@ -13,12 +13,12 @@ import { store } from './util/store.js';
 const route = useRoute();
 const router = useRouter();
 
-// Persistent reference to match your vanilla instantiation variable
+// Persistent reference matching your vanilla initialization variable
 let scanCatcher = null;
 
 /**
- * Checks if the picker is actively entering alphanumeric values into a form
- * group or configuring settings so we do not disrupt manual typing.
+ * Checks if the picker is actively entering values into standard form fields
+ * or server options so we do not disrupt manual text layout loops.
  */
 const isUserManuallyTyping = () => {
   if (isWebcamScannerOpen.value) return true; // Yield to camera module
@@ -28,13 +28,11 @@ const isUserManuallyTyping = () => {
 
   const tagName = activeEl.tagName.toLowerCase();
   
-  // Explicitly identify real manual text entries inside your Vue form layouts
   if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-    // If it's our scanner element, it doesn't count as manual user typing
     if (activeEl.id === 'hardwareScanCatcher') {
       return false;
     }
-    return true; // Picker is typing in a configuration or delivery registration form
+    return true; // Picker is actively writing a manual form layout
   }
   return false;
 };
@@ -47,32 +45,28 @@ const reclaimScannerFocus = () => {
   }
 };
 
-// Reclaims focus on click, exactly matching your vanilla event delegation layout
 const handleWindowClickReclaim = (event) => {
-  // If clicking an input directly, let focus transition natively without interruption
   if (event.target && (event.target.tagName.toLowerCase() === 'input' || event.target.tagName.toLowerCase() === 'textarea')) {
     return;
   }
-  // Wait a split second for focus pointers to settle, then reclaim
   setTimeout(reclaimScannerFocus, 50);
 };
 
 const handleHardwareWedgeInput = (event) => {
   if (event.key === 'Enter') {
+    //alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
     event.preventDefault();
     const rawScanString = scanCatcher.value.trim();
-    scanCatcher.value = ''; // Flush immediate operational state
+    scanCatcher.value = ''; // Instantly clear buffer for next rapid barcode scan
 
     if (!rawScanString) return;
-
-    // Standard native browser alert prompt window
-    alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
 
     processScannedBarcode(rawScanString);
   }
 };
 
 const processScannedBarcode = (barcodeString) => {
+  // Scenario 1: If scanning while on the registration screen, fill the input directly as before
   if (route.path === '/register_delivery') {
     const deliveryInput = document.querySelector('input[placeholder*="PO, STO, DC"]');
     if (deliveryInput) {
@@ -82,22 +76,34 @@ const processScannedBarcode = (barcodeString) => {
     return;
   }
 
+  // Scenario 2: Pull the current active shipment delivery from our global reactive cache
   const cachedData = store.cache.entityLists['ActiveDelivery'];
-  if (!cachedData) return;
+  if (!cachedData) {
+    console.warn('[ZEBRA HW] Scan canceled: No active delivery loaded in memory.');
+    return;
+  }
   
-  const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
+  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
   if (!activeDoc || !activeDoc.items) return;
 
+  // Search items matrix array to match by Article Code or physical Vendor EAN Barcode string
   const matchedItem = activeDoc.items.find(item => {
     return item.code === barcodeString || item.vendorId === barcodeString;
   });
 
   if (matchedItem) {
+    console.log(`[ZEBRA HARDWARE MATCH] Found product: ${matchedItem.description}. Updating counters...`);
+    
+    // 1. Directly increment the target element counter property in our reactive store
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
+
+    // 2. Force a programmatic layout swap straight to the interactive screen for that item
     router.push({
       path: '/receipt_item',
       query: { articleCode: matchedItem.code }
     });
+  } else {
+    console.warn(`[ZEBRA HARDWARE MATCH FAILURE] Code "${barcodeString}" does not belong to this delivery.`);
   }
 };
 
@@ -112,11 +118,11 @@ onMounted(() => {
   scanCatcher.type = 'text';
   scanCatcher.id = 'hardwareScanCatcher';
   
-  // 2. Assign the inputmode both as a property and as a structural attribute string
+  // 2. Assign properties for maximum broad Android WebKit browser compatibility
   scanCatcher.inputMode = 'none';
   scanCatcher.setAttribute('inputmode', 'none');
   
-  // 3. Match your old working layout CSS rules precisely
+  // 3. Match your vanilla project styling properties perfectly
   scanCatcher.style.position = 'fixed';
   scanCatcher.style.opacity = '0';
   scanCatcher.style.pointerEvents = 'none';
@@ -128,13 +134,13 @@ onMounted(() => {
 
   document.body.appendChild(scanCatcher);
   
-  // 4. Attach raw listeners straight to the generated DOM node
+  // 4. Attach listeners straight to the generated DOM node
   scanCatcher.addEventListener('keydown', handleHardwareWedgeInput);
   document.addEventListener('click', handleWindowClickReclaim, true);
 
   reclaimScannerFocus();
 
-  // 1-second continuous focus safety background syncing loop
+  // Continuous background focus safety synchronization checking loop
   window.zebraFocusStabilizer = setInterval(reclaimScannerFocus, 1000);
 });
 
