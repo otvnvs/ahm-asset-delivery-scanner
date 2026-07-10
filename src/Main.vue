@@ -4,16 +4,15 @@
   </div>
   
   <!-- 
-    We position the input inside the active screen layout bounds (top: 0, left: 0),
-    making it fully visible to the Android WebKit engine so it accepts high-speed injections.
-    By matching the font and background color to your app's dark theme surface variables,
-    and shrinking it to 1px with no borders, it remains completely invisible to human eyes.
+    The exact physical input tag setup from your working vanilla JS project.
+    By rendering it inside Main.vue alongside the top-level router-view container,
+    it remains safely mounted and never gets destroyed across all route transitions.
   -->
   <input
     id="hardwareScanCatcher"
     ref="scanCatcherRef"
     type="text"
-    class="zebra-hardware-receiver"
+    class="zebra-hidden-guardian"
     autocomplete="off"
     @keydown="handleHardwareWedgeInput"
   />
@@ -27,15 +26,16 @@ import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 
 const route = useRoute();
 const scanCatcherRef = ref(null);
-let continuousFocusInterval = null;
 
 const isTargetInputFocused = () => {
-  if (isWebcamScannerOpen.value) return true;
+  if (isWebcamScannerOpen.value) return true; // Yield to camera module
 
   const activeEl = document.activeElement;
   if (!activeEl) return false;
 
   const tagName = activeEl.tagName.toLowerCase();
+  
+  // Your exact whitelisted form components where focus shouldn't be stolen
   const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
 
   if (interactiveInputs.includes(activeEl.id) || 
@@ -55,27 +55,30 @@ const reclaimScannerFocus = () => {
   }
 };
 
+// Your exact global click handler pattern from the working vanilla app
 const handleWindowTapReclaim = (event) => {
+  // If clicking a manual form input field, let focus transition natively
   if (event.target && event.target.tagName.toLowerCase() === 'input') {
     return;
   }
+  // Wait 40ms for the DOM focus pointer to settle, then reclaim focus safely
   setTimeout(reclaimScannerFocus, 40);
 };
 
 const handleHardwareWedgeInput = (event) => {
-  // Capture when the Zebra hardware wedge slams the terminal Enter command sequence
   if (event.key === 'Enter') {
     event.preventDefault();
     const rawScanString = scanCatcherRef.value.value.trim();
-    scanCatcherRef.value.value = ''; // Instantly clear the field for the next scan
+    scanCatcherRef.value.value = ''; // Instantly clear buffer for next scan
 
     if (!rawScanString) return;
 
-    // HARDWARE SUCCESS ALERT
+    // Standard native browser alert window
     alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"`);
   }
 };
 
+// Reclaim scanner focus instantly when screen changes occur
 watch(() => route.path, () => {
   setTimeout(reclaimScannerFocus, 80);
 });
@@ -83,49 +86,35 @@ watch(() => route.path, () => {
 onMounted(() => {
   initWindowOverrides();
   
-  if (scanCatcherRef.value) {
-    // Disable the virtual on-screen keyboard layout entirely
-    scanCatcherRef.value.inputMode = 'none';
-    scanCatcherRef.value.setAttribute('inputmode', 'none');
-  }
-
+  // Reclaim focus initially on mount
   reclaimScannerFocus();
 
+  // Attach your exact working click listener to the master document window
   window.addEventListener('click', handleWindowTapReclaim, true);
-  
-  // Fast 250ms focus loop to ensure the laser catcher stays locked and focused
-  continuousFocusInterval = setInterval(reclaimScannerFocus, 250);
 });
 
 onUnmounted(() => {
   window.removeEventListener('click', handleWindowTapReclaim, true);
-  if (continuousFocusInterval) clearInterval(continuousFocusInterval);
 });
 </script>
 
 <style>
 /* 
-  Camouflage visibility layout strategy:
-  Instead of hiding it off-screen where WebKit disables multi-character hardware streams,
-  we mount it right at the top left corner of the screen layout wrapper but shrink it down
-  to 1px and make all text and colors match your exact theme background.
+  Your exact working off-screen styling configuration from the vanilla app.
+  This positions the element outside visible bounds so it doesn't disrupt 
+  your user interface layouts.
 */
-.zebra-hardware-receiver {
+.zebra-hidden-guardian {
   position: fixed !important;
-  left: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  left: -999px !important;
   top: 0 !important;
   width: 1px !important;
   height: 1px !important;
-  opacity: 1 !important;
-  background-color: #121214 !important; /* Matches your --bg-color exactly */
-  color: #121214 !important;            /* Matches your --bg-color exactly */
-  border: none !important;
-  outline: none !important;
-  box-shadow: none !important;
-  padding: 0 !important;
-  margin: 0 !important;
   z-index: -999999 !important;
-  pointer-events: none !important;
+  background: transparent !important;
+  border: none !important;
 }
 </style>
 
