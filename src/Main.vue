@@ -65,8 +65,48 @@ const handleHardwareWedgeInput = (event) => {
   }
 };
 
+//const processScannedBarcode = (barcodeString) => {
+//  // Scenario 1: If scanning while on the registration screen, fill the input directly as before
+//  if (route.path === '/register_delivery') {
+//    const deliveryInput = document.querySelector('input[placeholder*="PO, STO, DC"]');
+//    if (deliveryInput) {
+//      deliveryInput.value = barcodeString;
+//      deliveryInput.dispatchEvent(new Event('input', { bubbles: true }));
+//    }
+//    return;
+//  }
+//
+//  // Scenario 2: Pull the current active shipment delivery from our global reactive cache
+//  const cachedData = store.cache.entityLists['ActiveDelivery'];
+//  if (!cachedData) {
+//    console.warn('[ZEBRA HW] Scan canceled: No active delivery loaded in memory.');
+//    return;
+//  }
+//  
+//  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+//  if (!activeDoc || !activeDoc.items) return;
+//
+//  // Search items matrix array to match by Article Code or physical Vendor EAN Barcode string
+//  const matchedItem = activeDoc.items.find(item => {
+//    return item.code === barcodeString || item.vendorId === barcodeString;
+//  });
+//
+//  if (matchedItem) {
+//    console.log(`[ZEBRA HARDWARE MATCH] Found product: ${matchedItem.description}. Updating counters...`);
+//    
+//    // 1. Directly increment the target element counter property in our reactive store
+//    matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
+//
+//    // 2. Force a programmatic layout swap straight to the interactive screen for that item
+//    router.push({
+//      path: '/receipt_item',
+//      query: { articleCode: matchedItem.code }
+//    });
+//  } else {
+//    console.warn(`[ZEBRA HARDWARE MATCH FAILURE] Code "${barcodeString}" does not belong to this delivery.`);
+//  }
+//};
 const processScannedBarcode = (barcodeString) => {
-  // Scenario 1: If scanning while on the registration screen, fill the input directly as before
   if (route.path === '/register_delivery') {
     const deliveryInput = document.querySelector('input[placeholder*="PO, STO, DC"]');
     if (deliveryInput) {
@@ -76,36 +116,34 @@ const processScannedBarcode = (barcodeString) => {
     return;
   }
 
-  // Scenario 2: Pull the current active shipment delivery from our global reactive cache
   const cachedData = store.cache.entityLists['ActiveDelivery'];
-  if (!cachedData) {
-    console.warn('[ZEBRA HW] Scan canceled: No active delivery loaded in memory.');
-    return;
-  }
+  if (!cachedData) return;
   
-  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
   if (!activeDoc || !activeDoc.items) return;
 
-  // Search items matrix array to match by Article Code or physical Vendor EAN Barcode string
   const matchedItem = activeDoc.items.find(item => {
     return item.code === barcodeString || item.vendorId === barcodeString;
   });
 
   if (matchedItem) {
-    console.log(`[ZEBRA HARDWARE MATCH] Found product: ${matchedItem.description}. Updating counters...`);
-    
-    // 1. Directly increment the target element counter property in our reactive store
+    // 1. Directly increment the target element row property in our reactive storage
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
 
-    // 2. Force a programmatic layout swap straight to the interactive screen for that item
+    // 2. Force an immediate reactive screen update loop by appending a dynamic scan timestamp.
+    // This unique token tricks vue-router into realizing the route state has updated,
+    // which instantly triggers your sub-page watchers and forces the counter numbers 
+    // to step up continuously on the user canvas view in real-time.
     router.push({
       path: '/receipt_item',
-      query: { articleCode: matchedItem.code }
+      query: { 
+        articleCode: matchedItem.code,
+        _scan_ts: Date.now() // Unique execution seed parameter
+      }
     });
-  } else {
-    console.warn(`[ZEBRA HARDWARE MATCH FAILURE] Code "${barcodeString}" does not belong to this delivery.`);
   }
 };
+
 
 // Reclaim scanner focus instantly during cross-view transition sweeps
 watch(() => route.path, () => {
