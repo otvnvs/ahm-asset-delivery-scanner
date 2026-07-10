@@ -1,113 +1,96 @@
 <template>
-  <!--
-    Using a standard text input with an internal change/input listener as a secondary catch mechanism
-  -->
-  <input
-    ref="guardianInputRef"
-    v-model="scannedBuffer"
-    type="text"
-    class="zebra-hidden-guardian"
-    autocomplete="off"
-    inputmode="none"
-    autofocus
-    @keydown="handleKeyDown"
-    @blur="handleBlurFallback"
-  />
+  <!-- No invisible inputs to fight against Android OS keyboard layouts -->
+  <div class="zebra-headless-guardian" aria-hidden="true"></div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
+import { onMounted, onUnmounted } from 'vue';
+import { useRouter } from 'vue-router';
 import { store } from '../../util/store.js';
-import { isGlobalScanningActive, isUserEditing } from '../../util/barcodeScanner.js';
+import { isUserEditing } from '../../util/barcodeScanner.js';
 
 const router = useRouter();
-const route = useRoute();
-const guardianInputRef = ref(null);
-const scannedBuffer = ref('');
-let focusCheckInterval = null;
 
-const enforceFocus = () => {
-  if (isGlobalScanningActive.value && !isUserEditing()) {
-    guardianInputRef.value?.focus();
+// Dedicated local memory registry array to catch fast incoming individual keys
+let keystrokeBuffer = '';
+let lastKeyTimestamp = 0;
+
+const handleGlobalKeystroke = (event) => {
+  // Rule 1: Abort if the operator is intentionally interacting with an editable field
+  if (isUserEditing()) {
+    return;
   }
-};
 
-const handleBlurFallback = () => {
-  setTimeout(enforceFocus, 50);
-};
+  const now = Date.now();
 
-// Captures fast hardware emulated keyboard inputs
-const handleKeyDown = (event) => {
+  // Reset the buffer if the time gap since the last keystroke is too long.
+  // Hardware laser emulation types characters nearly instantaneously (typically under 15ms per char).
+  // If a picker types by hand with large delays, this protects layout loops.
+  if (now - lastKeyTimestamp > 250) {
+    keystrokeBuffer = '';
+  }
+  lastKeyTimestamp = now;
+
+  // Rule 2: Capture completion when the laser fires the terminating Enter sequence
   if (event.key === 'Enter') {
     event.preventDefault();
-    handleGlobalScan();
+    const finalizedBarcode = keystrokeBuffer.trim();
+    keystrokeBuffer = ''; // Flush immediate operational state
+
+    if (finalizedBarcode) {
+      // 🚨 DIAGNOSTIC WINDOW TARGET ALERT 🚨
+      alert(`[ZEBRA WINDOW INTERCEPTED]\nCode: "${finalizedBarcode}"`);
+
+      executeGlobalRoutingPipeline(finalizedBarcode);
+    }
+    return;
+  }
+
+  // Rule 3: Append raw alphanumeric character strings ignoring command keys (Shift, Alt, etc.)
+  if (event.key.length === 1) {
+    keystrokeBuffer += event.key;
   }
 };
 
-const handleGlobalScan = () => {
-  const scannedBarcode = scannedBuffer.value.trim();
-  scannedBuffer.value = ''; // Instantly clear buffer for subsequent rapid scans
-
-  if (!scannedBarcode) {
-    alert("Zebra Guardian triggered, but the captured barcode text buffer was empty.");
-    return;
-  }
-
-  // HARDWARE TELEMETRY DIAGNOSTIC ALERT
-  // This will display exactly what text strings are passing through the system
-  alert(`[ZEBRA HARDWARE DETECTED]\nScanned Code: "${scannedBarcode}"\nActive View Screen: ${route.path}`);
-
+const executeGlobalRoutingPipeline = (scannedBarcode) => {
   const cachedData = store.cache.entityLists['ActiveDelivery'];
-  if (!cachedData) {
-    console.warn('[ZEBRA ROUTER] Scan rejected: No active delivery loaded.');
-    return;
-  }
+  if (!cachedData) return;
   
   const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
   if (!activeDoc || !activeDoc.items) return;
 
+  // Match scanned code against Article Number string or physical Vendor EAN barcode attributes
   const matchedItem = activeDoc.items.find(item => {
     return item.code === scannedBarcode || item.vendorId === scannedBarcode;
   });
 
   if (matchedItem) {
+    // Automatically increment the receipt item line quantity counters
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
+
+    // Shift route focus cleanly straight to your destination screen layout
     router.push({
       path: '/receipt_item',
       query: { articleCode: matchedItem.code }
     });
   } else {
-    console.warn(`[ZEBRA ROUTER] Barcode "${scannedBarcode}" doesn't match items in this delivery list.`);
+    console.warn(`[ZEBRA MASTER CONTROL] Scanned item context "${scannedBarcode}" not in manifest rows.`);
   }
 };
 
-watch(() => route.path, () => {
-  setTimeout(enforceFocus, 100);
-});
-
 onMounted(() => {
-  enforceFocus();
-  focusCheckInterval = setInterval(enforceFocus, 1000);
+  // Register the event listener directly on the master window node
+  window.addEventListener('keydown', handleGlobalKeystroke, true);
 });
 
 onUnmounted(() => {
-  if (focusCheckInterval) clearInterval(focusCheckInterval);
+  window.removeEventListener('keydown', handleGlobalKeystroke, true);
 });
 </script>
 
 <style scoped>
-.zebra-hidden-guardian {
-  position: fixed;
-  left: 0;
-  top: 0;
-  width: 1px;
-  height: 1px;
-  opacity: 0;
-  pointer-events: none;
-  z-index: -99999;
-  background: transparent;
-  border: none;
+.zebra-headless-guardian {
+  display: none;
 }
 </style>
 
