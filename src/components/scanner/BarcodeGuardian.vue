@@ -1,18 +1,18 @@
 <template>
-  <!-- 
-    Using a transparent textarea completely eliminates the character-dropping issues.
-    inputmode="none" keeps the soft layout keyboard permanently closed on Android.
+  <!--
+    Using a standard text input with an internal change/input listener as a secondary catch mechanism
   -->
-  <textarea
+  <input
     ref="guardianInputRef"
     v-model="scannedBuffer"
+    type="text"
     class="zebra-hidden-guardian"
     autocomplete="off"
     inputmode="none"
     autofocus
-    @keyup.enter.prevent="handleGlobalScan"
+    @keydown="handleKeyDown"
     @blur="handleBlurFallback"
-  ></textarea>
+  />
 </template>
 
 <script setup>
@@ -37,46 +37,51 @@ const handleBlurFallback = () => {
   setTimeout(enforceFocus, 50);
 };
 
+// Captures fast hardware emulated keyboard inputs
+const handleKeyDown = (event) => {
+  if (event.key === 'Enter') {
+    event.preventDefault();
+    handleGlobalScan();
+  }
+};
+
 const handleGlobalScan = () => {
-  // Strip out any trailing newline symbols inserted by the rapid emulation layer
-  const scannedBarcode = scannedBuffer.value.replace(/[\r\n]+/g, '').trim();
-  scannedBuffer.value = ''; // Instantly clear the field so it's ready for the next box scan
+  const scannedBarcode = scannedBuffer.value.trim();
+  scannedBuffer.value = ''; // Instantly clear buffer for subsequent rapid scans
 
-  if (!scannedBarcode) return;
+  if (!scannedBarcode) {
+    alert("Zebra Guardian triggered, but the captured barcode text buffer was empty.");
+    return;
+  }
 
-  console.log(`[ZEBRA SYSTEM CONTROL] Successfully captured code from hardware: ${scannedBarcode}`);
+  // HARDWARE TELEMETRY DIAGNOSTIC ALERT
+  // This will display exactly what text strings are passing through the system
+  alert(`[ZEBRA HARDWARE DETECTED]\nScanned Code: "${scannedBarcode}"\nActive View Screen: ${route.path}`);
 
   const cachedData = store.cache.entityLists['ActiveDelivery'];
   if (!cachedData) {
-    console.warn('[ZEBRA ROUTER] Scan rejected: No active delivery loaded in store memory.');
+    console.warn('[ZEBRA ROUTER] Scan rejected: No active delivery loaded.');
     return;
   }
   
-  const activeDoc = Array.isArray(cachedData) ? cachedData[0] : cachedData;
+  const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
   if (!activeDoc || !activeDoc.items) return;
 
-  // Scan items to match against Article identifier or the physical Vendor EAN barcode string
   const matchedItem = activeDoc.items.find(item => {
     return item.code === scannedBarcode || item.vendorId === scannedBarcode;
   });
 
   if (matchedItem) {
-    console.log(`[ZEBRA ROUTER] Match found for: ${matchedItem.description}. Redirecting...`);
-    
-    // Automatically increment the data counter row
     matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
-
-    // Force an immediate programmatic layout shift to your receipt view layout
     router.push({
       path: '/receipt_item',
       query: { articleCode: matchedItem.code }
     });
   } else {
-    console.warn(`[ZEBRA ROUTER] Barcode "${scannedBarcode}" does not exist in active shipment manifest.`);
+    console.warn(`[ZEBRA ROUTER] Barcode "${scannedBarcode}" doesn't match items in this delivery list.`);
   }
 };
 
-// Re-enforce focus priority instantly when moving between router-view tabs
 watch(() => route.path, () => {
   setTimeout(enforceFocus, 100);
 });
@@ -94,17 +99,15 @@ onUnmounted(() => {
 <style scoped>
 .zebra-hidden-guardian {
   position: fixed;
-  left: -9999px;
-  top: -9999px;
-  width: 10px;
-  height: 10px;
+  left: 0;
+  top: 0;
+  width: 1px;
+  height: 1px;
   opacity: 0;
   pointer-events: none;
-  z-index: -9999;
+  z-index: -99999;
   background: transparent;
   border: none;
-  resize: none;
-  overflow: hidden;
 }
 </style>
 
