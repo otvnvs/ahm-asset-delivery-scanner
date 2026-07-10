@@ -2,95 +2,90 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
-  
-  <input
-    id="hardwareScanCatcher"
-    ref="scanCatcherRef"
-    type="text"
-    class="zebra-hidden-guardian"
-    autocomplete="off"
-    @keydown="handleHardwareWedgeInput"
-    @input="handleDataInjected"
-  />
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue';
+import { onMounted, onUnmounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 import { store } from './util/store.js';
 
 const route = useRoute();
 const router = useRouter();
-const scanCatcherRef = ref(null);
 
-let continuousFocusInterval = null;
-let inputDebounceTimeout = null;
+// Memory registries to capture high-speed sequential characters
+let hardwareBufferString = '';
+let lastKeystrokeTime = 0;
+let samsungIdleTimer = null;
 
-const isTargetInputFocused = () => {
-  if (isWebcamScannerOpen.value) return true;
+/**
+ * Checks if the warehouse picker is intentionally typing inside a real 
+ * form field so we do not steal or disrupt intentional text input loops.
+ */
+const isUserManuallyEditing = () => {
+  if (isWebcamScannerOpen.value) return true; // Camera QR pass
 
   const activeEl = document.activeElement;
   if (!activeEl) return false;
 
   const tagName = activeEl.tagName.toLowerCase();
-  const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
+  const manualInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
 
-  if (interactiveInputs.includes(activeEl.id) || 
+  if (manualInputs.includes(activeEl.id) || 
       activeEl.className?.includes('form-input') || 
       tagName === 'textarea' || 
-      activeEl.id === 'hardwareScanCatcher') {
-    return true;
+      tagName === 'select') {
+    return true; // Picker is filling out a manual form field
   }
   return false;
 };
 
-const reclaimScannerFocus = () => {
-  if (!isTargetInputFocused()) {
-    if (scanCatcherRef.value) {
-      scanCatcherRef.value.focus();
-    }
-  }
-};
+// Root-level capture loop
+const handleRootKeystroke = (event) => {
+  // Abort instantly if the user is typing inside an official manual text box
+  if (isUserManuallyEditing()) return;
 
-const handleWindowTapReclaim = (event) => {
-  if (event.target && event.target.tagName.toLowerCase() === 'input') {
-    return;
-  }
-  setTimeout(reclaimScannerFocus, 40);
-};
+  const timestamp = Date.now();
 
-// Channel 1: Catch high-speed Zebra scanner triggers with terminating Enter codes
-const handleHardwareWedgeInput = (event) => {
+  // Reset the data buffer array if the gap since the last keystroke is too long.
+  // Both hardware lasers and fast finger typing send characters within short intervals.
+  // If the worker walks away or types slowly, this clears the buffer safely.
+  if (timestamp - lastKeystrokeTime > 250) {
+    hardwareBufferString = '';
+  }
+  lastKeystrokeTime = timestamp;
+
+  // Track completion channel A: The hardware laser fires a terminating Enter command sequence
   if (event.key === 'Enter') {
     event.preventDefault();
-    evaluateAndRouteCapturedBuffer();
+    if (samsungIdleTimer) clearTimeout(samsungIdleTimer);
+    commitCapturedBuffer();
+    return;
+  }
+
+  // Catch single characters (letters/numbers) ignoring function keys (Shift, Ctrl, Alt)
+  if (event.key.length === 1) {
+    hardwareBufferString += event.key;
+
+    // Track completion channel B: Manual fast Samsung typing fallback tracker
+    // If you type fast and pause for 300ms without pressing Enter, it evaluates the string automatically!
+    if (samsungIdleTimer) clearTimeout(samsungIdleTimer);
+    samsungIdleTimer = setTimeout(() => {
+      commitCapturedBuffer();
+    }, 300);
   }
 };
 
-// Channel 2: Catch manual Samsung speed-typing tests that don't include Enter keys
-const handleDataInjected = () => {
-  if (inputDebounceTimeout) clearTimeout(inputDebounceTimeout);
+const commitCapturedBuffer = () => {
+  const finalizedBarcode = hardwareBufferString.trim();
+  hardwareBufferString = ''; // Immediately clear buffer for the next scan sequence
 
-  // When typing manually, wait 400ms after the last character is struck to process it automatically
-  inputDebounceTimeout = setTimeout(() => {
-    evaluateAndRouteCapturedBuffer();
-  }, 400);
-};
+  if (!finalizedBarcode) return;
 
-const evaluateAndRouteCapturedBuffer = () => {
-  if (!scanCatcherRef.value) return;
+  // 🚨 STANDARD SYNCHRONOUS BROWSER DIALOG POPUP 🚨
+  alert(`[ZEBRA WEDGED DETECTED]\nData: "${finalizedBarcode}"\nActive View Screen: ${route.path}`);
 
-  const rawScanString = scanCatcherRef.value.value.trim();
-  scanCatcherRef.value.value = ''; // Flush immediately for subsequent rapid box scans
-
-  if (!rawScanString) return;
-
-  // This alert will now pop open successfully!
-  alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
-
-  processScannedBarcode(rawScanString);
+  processScannedBarcode(finalizedBarcode);
 };
 
 const processScannedBarcode = (barcodeString) => {
@@ -122,43 +117,22 @@ const processScannedBarcode = (barcodeString) => {
   }
 };
 
-watch(() => route.path, () => {
-  setTimeout(reclaimScannerFocus, 80);
-});
-
 onMounted(() => {
-  initWindowOverrides();
-
-  if (scanCatcherRef.value) {
-    scanCatcherRef.value.inputMode = 'none';
-    scanCatcherRef.value.setAttribute('inputmode', 'none');
-  }
-
-  reclaimScannerFocus();
-
-  window.addEventListener('click', handleWindowTapReclaim, true);
-  continuousFocusInterval = setInterval(reclaimScannerFocus, 1000);
+  // Bind directly to the master window node using Event Capturing mode (true flag)
+  // This interceptor will catch key strokes BEFORE any router grid card can block it.
+  window.addEventListener('keydown', handleRootKeystroke, true);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('click', handleWindowTapReclaim, true);
-  if (continuousFocusInterval) clearInterval(continuousFocusInterval);
-  if (inputDebounceTimeout) clearTimeout(inputDebounceTimeout);
+  window.removeEventListener('keydown', handleRootKeystroke, true);
+  if (samsungIdleTimer) clearTimeout(samsungIdleTimer);
 });
 </script>
 
 <style>
-.zebra-hidden-guardian {
-  position: fixed !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  left: -999px !important;
-  top: 0 !important;
-  width: 1px !important;
-  height: 1px !important;
-  z-index: -999999 !important;
-  background: transparent !important;
-  border: none !important;
+.minimal-container {
+  width: 100%;
+  box-sizing: border-box;
 }
 </style>
 
