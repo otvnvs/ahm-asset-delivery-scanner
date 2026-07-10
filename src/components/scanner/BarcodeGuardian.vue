@@ -20,7 +20,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { initWindowOverrides } from './components/dialog/useDialog.js';
 import { isWebcamScannerOpen } from '../../util/barcodeScanner.js';
 import { store } from './util/store.js';
 
