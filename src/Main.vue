@@ -2,32 +2,25 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
-  
-  <!-- 
-    The exact physical input tag setup from your working vanilla JS project.
-    By rendering it inside Main.vue alongside the top-level router-view container,
-    it remains safely mounted and never gets destroyed across all route transitions.
-  -->
-  <input
-    id="hardwareScanCatcher"
-    ref="scanCatcherRef"
-    type="text"
-    class="zebra-hidden-guardian"
-    autocomplete="off"
-    @keydown="handleHardwareWedgeInput"
-  />
 </template>
 
 <script setup>
-import { onMounted, onUnmounted, ref, watch } from 'vue';
-import { useRoute } from 'vue-router';
-import { initWindowOverrides } from './components/dialog/useDialog.js';
+import { onMounted, onUnmounted, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
+import { store } from './util/store.js';
 
 const route = useRoute();
-const scanCatcherRef = ref(null);
+const router = useRouter();
 
-const isTargetInputFocused = () => {
+// Persistent reference to match your vanilla instantiation variable
+let scanCatcher = null;
+
+/**
+ * Checks if the picker is actively entering alphanumeric values into a form
+ * group or configuring settings so we do not disrupt manual typing.
+ */
+const isUserManuallyTyping = () => {
   if (isWebcamScannerOpen.value) return true; // Yield to camera module
 
   const activeEl = document.activeElement;
@@ -35,86 +28,130 @@ const isTargetInputFocused = () => {
 
   const tagName = activeEl.tagName.toLowerCase();
   
-  // Your exact whitelisted form components where focus shouldn't be stolen
-  const interactiveInputs = ['inputDeliveryNum', 'inputSscc', 'inputRef', 'inputEditQty'];
-
-  if (interactiveInputs.includes(activeEl.id) || 
-      activeEl.className?.includes('form-input') || 
-      tagName === 'textarea' || 
-      activeEl.id === 'hardwareScanCatcher') {
-    return true;
+  // Explicitly identify real manual text entries inside your Vue form layouts
+  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
+    // If it's our scanner element, it doesn't count as manual user typing
+    if (activeEl.id === 'hardwareScanCatcher') {
+      return false;
+    }
+    return true; // Picker is typing in a configuration or delivery registration form
   }
   return false;
 };
 
 const reclaimScannerFocus = () => {
-  if (!isTargetInputFocused()) {
-    if (scanCatcherRef.value) {
-      scanCatcherRef.value.focus();
+  if (!isUserManuallyTyping()) {
+    if (scanCatcher) {
+      scanCatcher.focus();
     }
   }
 };
 
-// Your exact global click handler pattern from the working vanilla app
-const handleWindowTapReclaim = (event) => {
-  // If clicking a manual form input field, let focus transition natively
-  if (event.target && event.target.tagName.toLowerCase() === 'input') {
+// Reclaims focus on click, exactly matching your vanilla event delegation layout
+const handleWindowClickReclaim = (event) => {
+  // If clicking an input directly, let focus transition natively without interruption
+  if (event.target && (event.target.tagName.toLowerCase() === 'input' || event.target.tagName.toLowerCase() === 'textarea')) {
     return;
   }
-  // Wait 40ms for the DOM focus pointer to settle, then reclaim focus safely
-  setTimeout(reclaimScannerFocus, 40);
+  // Wait a split second for focus pointers to settle, then reclaim
+  setTimeout(reclaimScannerFocus, 50);
 };
 
 const handleHardwareWedgeInput = (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    const rawScanString = scanCatcherRef.value.value.trim();
-    scanCatcherRef.value.value = ''; // Instantly clear buffer for next scan
+    const rawScanString = scanCatcher.value.trim();
+    scanCatcher.value = ''; // Flush immediate operational state
 
     if (!rawScanString) return;
 
-    // Standard native browser alert window
-    alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"`);
+    // Standard native browser alert prompt window
+    alert(`[ZEBRA WEDGED DETECTED]\nData: "${rawScanString}"\nActive View Screen: ${route.path}`);
+
+    processScannedBarcode(rawScanString);
   }
 };
 
-// Reclaim scanner focus instantly when screen changes occur
+const processScannedBarcode = (barcodeString) => {
+  if (route.path === '/register_delivery') {
+    const deliveryInput = document.querySelector('input[placeholder*="PO, STO, DC"]');
+    if (deliveryInput) {
+      deliveryInput.value = barcodeString;
+      deliveryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    return;
+  }
+
+  const cachedData = store.cache.entityLists['ActiveDelivery'];
+  if (!cachedData) return;
+  
+  const activeDoc = Array.isArray(cachedData) ? cachedData : cachedData;
+  if (!activeDoc || !activeDoc.items) return;
+
+  const matchedItem = activeDoc.items.find(item => {
+    return item.code === barcodeString || item.vendorId === barcodeString;
+  });
+
+  if (matchedItem) {
+    matchedItem.recptQty = (parseInt(matchedItem.recptQty, 10) || 0) + 1;
+    router.push({
+      path: '/receipt_item',
+      query: { articleCode: matchedItem.code }
+    });
+  }
+};
+
+// Reclaim scanner focus instantly during cross-view transition sweeps
 watch(() => route.path, () => {
-  setTimeout(reclaimScannerFocus, 80);
+  setTimeout(reclaimScannerFocus, 100);
 });
 
 onMounted(() => {
-  initWindowOverrides();
+  // 1. Programmatically construct the element exactly as your vanilla project did
+  scanCatcher = document.createElement('input');
+  scanCatcher.type = 'text';
+  scanCatcher.id = 'hardwareScanCatcher';
   
-  // Reclaim focus initially on mount
+  // 2. Assign the inputmode both as a property and as a structural attribute string
+  scanCatcher.inputMode = 'none';
+  scanCatcher.setAttribute('inputmode', 'none');
+  
+  // 3. Match your old working layout CSS rules precisely
+  scanCatcher.style.position = 'fixed';
+  scanCatcher.style.opacity = '0';
+  scanCatcher.style.pointerEvents = 'none';
+  scanCatcher.style.left = '-999px';
+  scanCatcher.style.top = '0';
+  scanCatcher.style.width = '1px';
+  scanCatcher.style.height = '1px';
+  scanCatcher.style.zIndex = '-999999';
+
+  document.body.appendChild(scanCatcher);
+  
+  // 4. Attach raw listeners straight to the generated DOM node
+  scanCatcher.addEventListener('keydown', handleHardwareWedgeInput);
+  document.addEventListener('click', handleWindowClickReclaim, true);
+
   reclaimScannerFocus();
 
-  // Attach your exact working click listener to the master document window
-  window.addEventListener('click', handleWindowTapReclaim, true);
+  // 1-second continuous focus safety background syncing loop
+  window.zebraFocusStabilizer = setInterval(reclaimScannerFocus, 1000);
 });
 
 onUnmounted(() => {
-  window.removeEventListener('click', handleWindowTapReclaim, true);
+  if (scanCatcher && document.body.contains(scanCatcher)) {
+    scanCatcher.removeEventListener('keydown', handleHardwareWedgeInput);
+    document.body.removeChild(scanCatcher);
+  }
+  document.removeEventListener('click', handleWindowClickReclaim, true);
+  if (window.zebraFocusStabilizer) clearInterval(window.zebraFocusStabilizer);
 });
 </script>
 
 <style>
-/* 
-  Your exact working off-screen styling configuration from the vanilla app.
-  This positions the element outside visible bounds so it doesn't disrupt 
-  your user interface layouts.
-*/
-.zebra-hidden-guardian {
-  position: fixed !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-  left: -999px !important;
-  top: 0 !important;
-  width: 1px !important;
-  height: 1px !important;
-  z-index: -999999 !important;
-  background: transparent !important;
-  border: none !important;
+.minimal-container {
+  width: 100%;
+  box-sizing: border-box;
 }
 </style>
 
