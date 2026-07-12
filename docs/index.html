@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Launching App Package</title>
+    
+    <!-- Lightweight QR Code Library from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
+
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-main: #f0f6fc;
+            --text-muted: #8b949e;
+            --accent: #58a6ff;
+            --accent-hover: #1f6feb;
+            --border-color: #30363d;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 32px 24px;
+            max-width: 440px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            margin: 0 auto 20px auto;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.2px;
+        }
+
+        .repo-display {
+            font-family: monospace;
+            background: #21262d;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--accent);
+            display: inline-block;
+            margin-bottom: 16px;
+        }
+
+        p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-bottom: 24px;
+        }
+
+        .btn {
+            display: inline-block;
+            width: 100%;
+            background-color: var(--accent);
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.95rem;
+            padding: 12px 24px;
+            border-radius: 6px;
+            transition: background-color 0.2s ease;
+            margin-bottom: 24px;
+        }
+
+        .btn:hover {
+            background-color: var(--accent-hover);
+        }
+
+        /* QR Code Container Styling */
+        .qr-section {
+            border-top: 1px solid var(--border-color);
+            padding-top: 24px;
+            margin-top: 8px;
+        }
+
+        .qr-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .qr-wrapper {
+            background: white; /* Ensures high contrast scanning */
+            padding: 12px;
+            border-radius: 8px;
+            display: inline-block;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        .footer {
+            margin-top: 24px;
+            font-size: 0.8rem;
+            color: #484f58;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 24px 16px;
+                border: none;
+                background: transparent;
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="spinner" id="loading-spinner"></div>
+        <h1 id="title-text">Launching Application</h1>
+        <div class="repo-display" id="repo-name">Detecting repository...</div>
+        
+        <p>Attempting to pass the deployment package to your application. Please approve any system prompts.</p>
+        
+        <!-- Deep link destination (Populated by JS) -->
+        <a href="#" id="manual-btn" class="btn">Open Manually</a>
+
+        <!-- QR Code Module -->
+        <div class="qr-section">
+            <div class="qr-label">Scan to deploy on mobile</div>
+            <div class="qr-wrapper">
+                <div id="qrcode"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            Protocol: ahm-app://
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // 1. Automatically parse username and repo from the URL path
+            // Format example: https://otvnvs.github.io/ahm-asset-delivery-scanner/
+            const hostname = window.location.hostname;
+            const pathParts = window.location.pathname.split('/').filter(part => part.length > 0);
+            
+            let username = "otvnvs"; // Safe fallback
+            let repoName = "ahm-asset-delivery-scanner"; // Safe fallback
+
+            if (hostname.includes('.github.io') && pathParts.length >= 1) {
+                username = hostname.split('.')[0];
+                repoName = pathParts[0];
+            }
+
+            // 2. Build the exact dynamic URLs you requested
+            const zipUrl = `https://github.com{username}/${repoName}/archive/refs/heads/main.zip`;
+            const deepLinkUrl = `ahm-app://deploy?package_url=${zipUrl}`;
+
+            // 3. Update the visual UI labels
+            document.getElementById('repo-name').textContent = repoName;
+            
+            // 4. Update the interactive elements
+            const manualBtn = document.getElementById('manual-btn');
+            manualBtn.href = deepLinkUrl;
+
+            // 5. Fire off the automated redirect attempt
+            window.location.href = deepLinkUrl;
+
+            // 6. Generate the high-contrast QR code pointing to the full deep link structure
+            // Using window.onload to guarantee the qrcode.js CDN library is loaded
+            window.addEventListener('load', () => {
+                new QRCode(document.getElementById("qrcode"), {
+                    text: deepLinkUrl,
+                    width: 140,
+                    height: 140,
+                    colorDark : "#000000",
+                    colorLight : "#ffffff",
+                    correctLevel : QRCode.CorrectLevel.M
+                });
+            });
+        });
+    </script>
+
+</body>
+</html>
+
