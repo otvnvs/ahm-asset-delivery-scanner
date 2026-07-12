@@ -5,6 +5,8 @@ A lightweight mobile asset for [Android Hybrid Mobile](https://github.com/otvnvs
 
 **Direct Install Link:** [ahm-app://deploy?package_url=ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip](ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip)
 
+![Download Link](/qr.png)
+
 
 ## Features
 
