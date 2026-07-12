@@ -2,6 +2,10 @@
 
 A lightweight mobile asset for [Android Hybrid Mobile](https://github.com/otvnvs/android-hybrid-mobile) designed to fetch incoming palette manifests, verify items via barcode scanning, and synchronize results back to the server.
 
+
+**Direct Install Link:** [ahm-app://deploy?package_url=ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip](ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip)
+
+
 ## Features
 
 * **3-Tile Dashboard**: Clean home screen interface for rapid warehouse navigation.

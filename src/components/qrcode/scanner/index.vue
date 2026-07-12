@@ -130,7 +130,10 @@
 //};
 //--------------------------------------------------------------------------------
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-import Html5QrCode from '../../../lib/html5-qrcode/html5-qrcode.min.js';
+//import Html5QrCode from '../../../lib/html5-qrcode/html5-qrcode.min.js';
+import '../../../lib/html5-qrcode/html5-qrcode.min.js';
+const Html5QrCode = window.__Html5QrcodeLibrary__;//.Html5Qrcode;
+//const Html5Qrcode = window.Html5Qrcode;
 
 const emit = defineEmits(['close', 'scanned']);
 const feedbackMessage = ref('Initializing camera matrix...');

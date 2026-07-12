@@ -4,12 +4,11 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "vite:start": "vite",
-    "vite:preview": "vite preview",
-    "vite:dist": "vite build",
-    "serve": "python -m http.server 8000 --directory ./",
+    "start": "vite",
+    "preview": "vite preview",
     "serve:dist": "python -m http.server 8000 --directory ./dist",
-    "serve:sfc": "python -m http.server 1234"
+    "serve:sfc": "python -m http.server 1234",
+    "dist": "vite build"
   },
   "keywords": [],
   "author": "",
@@ -18,9 +17,11 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.7",
     "vite": "^8.0.16",
+    "vite-plugin-qrcode": "^0.4.1",
     "vue": "^3.5.38"
   },
   "dependencies": {
+    "html5-qrcode": "^2.3.8",
     "vue-router": "^4.6.4"
   }
 }
