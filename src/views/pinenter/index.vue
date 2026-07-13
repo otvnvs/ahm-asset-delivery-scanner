@@ -42,8 +42,8 @@ const handleVerifyPin = (enteredPin) => {
 };
 
 // Clear out application data and bounce back to setup phase
-const handleForgotPin = () => {
-  const confirmReset = confirm("Are you sure you want to reset your PIN? This will wipe your saved access settings.");
+const handleForgotPin = async() => {
+  const confirmReset = await confirm("Are you sure you want to reset your PIN? This will wipe your saved access settings.");
   
   if (confirmReset) {
     // 1. Hand off all database mutation loops to the store action context

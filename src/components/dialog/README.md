@@ -38,7 +38,7 @@ Invoke the override initialization during the root mount sequence of your applic
 
 ```javascript
 import { onMounted } from 'vue';
-import { initWindowOverrides } from './util/useDialog.js';
+import { initWindowOverrides } from './components/dialog/useDialog.js';
 
 onMounted(() => {
   initWindowOverrides();

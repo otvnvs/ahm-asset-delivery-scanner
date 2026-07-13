@@ -2,6 +2,7 @@
   <div class="minimal-container">
     <router-view></router-view>
   </div>
+  <CustomDialog />
 </template>
 
 <script setup>
@@ -9,6 +10,10 @@ import { onMounted, onUnmounted, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { isWebcamScannerOpen } from './util/barcodeScanner.js';
 import { store } from './util/store.js';
+
+import { initWindowOverrides } from './components/dialog/useDialog.js';
+import CustomDialog from './components/dialog/CustomDialog.vue';
+
 
 const route = useRoute();
 const router = useRouter();
@@ -154,6 +159,7 @@ watch(() => route.path, () => {
 });
 
 onMounted(() => {
+  initWindowOverrides();
   // 1. Programmatically construct the element exactly as your vanilla project did
   scanCatcher = document.createElement('input');
   scanCatcher.type = 'text';
