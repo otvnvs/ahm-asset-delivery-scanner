@@ -1,7 +1,8 @@
 {
-  "name": "Delivery",
-  "svgContent": "<path d='M12 2L2 22h20L12 2z'/>",
+  "name": "Delivery Scanner",
+  "svgContent": "<path d='M3 5h2v14H3zm4 0h1v14H7zm4 0h2v14h-2zm5 0h1v14h-1zm4 0h1v14h-1zM2 12h20' stroke='currentColor' stroke-width='2' stroke-linecap='round'/>",
   "type": "iframe",
   "entry": "index.html",
   "files": ["app.json", "index.html"]
 }
+
