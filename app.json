@@ -2,6 +2,6 @@
   "name": "Delivery",
   "svgContent": "<path d='M12 2L2 22h20L12 2z'/>",
   "type": "iframe",
-  "entry": "dist/index.html",
+  "entry": "index.html",
   "files": ["app.json", "index.html"]
 }
