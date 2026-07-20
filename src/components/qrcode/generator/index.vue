@@ -1,9 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { getMatrix, renderPath } from '../../../lib/qr-code-generator/qr-code-generator-lib.mjs'
+import { renderSVG } from 'uqr'
 
-
-// Define the component properties
 const props = defineProps({
   text: {
     type: String,
@@ -19,37 +17,27 @@ const props = defineProps({
   }
 })
 
-// Compute the SVG path data and bounds whenever text changes
-const qrSvgData = computed(() => {
-  if (!props.text) return null
+const qrSvgHtml = computed(() => {
+  if (!props.text) return ''
   try {
-    const matrix = getMatrix(props.text)
-    return renderPath(matrix)
+    return renderSVG(props.text, { blackColor: props.color })
   } catch (error) {
     console.error('Failed to generate QR Code:', error)
-    return null
+    return ''
   }
 })
 </script>
 
 <template>
-  <div class="qr-container" :style="{ width: size + 'px', height: size + 'px' }">
-    <!-- Notice the stroke and stroke-width properties added here per library specifications -->
-    <svg
-      v-if="qrSvgData"
-      xmlns="http://www.w3.org/2000/svg"
-      :viewBox="`0 0 ${qrSvgData.dim} ${qrSvgData.dim}`"
-      :stroke="color"
-      stroke-width="1.05"
-      shape-rendering="crispEdges"
-    >
-      <path :d="qrSvgData.d" />
-    </svg>
-  </div>
+  <div
+    class="qr-container"
+    :style="{ width: size + 'px', height: size + 'px' }"
+    v-html="qrSvgHtml"
+  />
 </template>
 
 <style scoped>
-.qr-container svg {
+.qr-container :deep(svg) {
   width: 100%;
   height: 100%;
   display: block;

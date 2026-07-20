@@ -7,7 +7,6 @@
     "start": "vite",
     "preview": "vite preview",
     "serve:dist": "python -m http.server 8000 --directory ./dist",
-    "serve:sfc": "python -m http.server 1234",
     "dist": "vite build"
   },
   "keywords": [],
@@ -21,6 +20,7 @@
     "vue": "^3.5.38"
   },
   "dependencies": {
+    "@otvnvs/ahm-decabase-odata": "file:..",
     "html5-qrcode": "^2.3.8",
     "vue-router": "^4.6.4"
   }

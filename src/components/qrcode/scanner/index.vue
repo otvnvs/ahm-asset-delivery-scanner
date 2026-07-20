@@ -31,7 +31,7 @@
 //onMounted(() => {
 //  // 1. Initialize the engine targeting our div ID
 //  // Depending on your wrapper method, check if you need: new Html5QrCode.Html5Qrcode(...)
-//  scannerInstance = new Html5QrCode.Html5Qrcode("qr-code-region");
+//  scannerInstance = new Html5Qrcode("qr-code-region");
 //  
 //  startCameraStream();
 //});
@@ -130,10 +130,7 @@
 //};
 //--------------------------------------------------------------------------------
 import { ref, onMounted, onBeforeUnmount } from 'vue';
-//import Html5QrCode from '../../../lib/html5-qrcode/html5-qrcode.min.js';
-import '../../../lib/html5-qrcode/html5-qrcode.min.js';
-const Html5QrCode = window.__Html5QrcodeLibrary__;//.Html5Qrcode;
-//const Html5Qrcode = window.Html5Qrcode;
+import { Html5Qrcode } from 'html5-qrcode';
 
 const emit = defineEmits(['close', 'scanned']);
 const feedbackMessage = ref('Initializing camera matrix...');
@@ -244,7 +241,7 @@ const acquireCameraHardwareClearance = async () => {
 
 onMounted(async () => {
   // Step 1: Initialize the structural html5-qrcode instance target selector
-  scannerInstance = new Html5QrCode.Html5Qrcode("qr-code-region");
+  scannerInstance = new Html5Qrcode("qr-code-region");
   
   // Step 2: Fire the zero-dependency permissions checkpoint
   const pathClearForStreaming = await acquireCameraHardwareClearance();

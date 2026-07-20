@@ -183,7 +183,7 @@ import MenuTop from '../../components/menutop/index.vue';
 import QrCode from '../../components/qrcode/generator/index.vue';
 import QrCodeScanner from '../../components/qrcode/scanner/index.vue';
 import { store, storeActions } from '../../util/store.js';
-import { testODataConnection } from '../../util/odata.js';
+import { testServiceMetadata } from '../../util/odata.js';
 import { isWebcamScannerOpen } from '../../util/barcodeScanner.js';
 
 const router = useRouter();
@@ -355,8 +355,8 @@ const runDiagnostics = async () => {
 //      testServiceMetadata(grUrl)
 //    ]);
     let results=[];
-    results.push(await testServiceMetadata(registerUrl))
-    results.push(await testServiceMetadata(grUrl))
+    results.push(await runServiceMetadataTest(registerUrl))
+    results.push(await runServiceMetadataTest(grUrl))
 
     if (results[0] && results[1]) {
       testResult.value = { 
@@ -377,93 +377,9 @@ const runDiagnostics = async () => {
   }
 };
 
-// Helper to test a specific URL's metadata
-//const testServiceMetadata = async (baseUrl) => {
-//  try {
-//    // Re-using internal logic similar to odataFetch but strictly for testing metadata
-//    const endpoint = `${baseUrl}/$metadata`;
-//    const headers = new Headers();
-//    headers.set('Accept', 'application/xml, text/xml');
-//    if (localConfig.value.username) {
-//      const encoded = btoa(`${localConfig.value.username}:${localConfig.value.password || ''}`);
-//      headers.set('Authorization', `Basic ${encoded}`);
-//    }
-//    if (localConfig.value.sapClient) {
-//       // Append client if needed for metadata
-//       // Note: fetch doesn't auto append query params, must be in URL string if needed
-//       // Usually metadata works without client, but safe to add if strict.
-//    }
-//    
-//    const controller = new AbortController();
-//    setTimeout(() => controller.abort(), localConfig.value.networkTimeoutMs);
-//
-//    const response = await fetch(endpoint, { 
-//      method: 'GET', 
-//      headers, 
-//      signal: controller.signal,
-//      mode: 'cors'
-//    });
-//
-//    if (!response.ok) return false;
-//    const text = await response.text();
-//    return text.includes('Edmx'); // Basic validation
-//  } catch (e) {
-//    console.error(`Test failed for ${baseUrl}:`, e);
-//    return false;
-//  }
-//};
-const testServiceMetadata = async (baseUrl) => {
+const runServiceMetadataTest = async (baseUrl) => {
   try {
-    const BROKER_URL = "/api/net/request";
-    const endpoint = `${baseUrl}/$metadata`;
-    
-    // 1. Establish the clean, case-normalized headers dictionary context map
-    const normalizedHeaders = {
-      "Accept": "application/xml, text/xml"
-    };
-
-    if (localConfig.value.username) {
-      const encoded = btoa(`${localConfig.value.username}:${localConfig.value.password || ''}`);
-      normalizedHeaders["Authorization"] = `Basic ${encoded}`;
-    }
-
-    // 2. Package everything explicitly into your native orchestration request envelope structure
-    const proxyEnvelope = {
-      "timeout_ms": localConfig.value.networkTimeoutMs || 15000,
-      "request": {
-        "url": endpoint,
-        "method": "GET",
-        "headers": normalizedHeaders
-      }
-    };
-
-    // 3. Dispatch standard Same-Origin fetch payload directly to your local proxy broker endpoint
-    const brokerResponse = await fetch(BROKER_URL, {
-      method: 'POST',
-      headers: {
-        //'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(proxyEnvelope)
-    });
-
-    if (!brokerResponse.ok) {
-      console.error(`Local Proxy Broker channel unreachable during diagnostics metadata sweep.`);
-      return false;
-    }
-
-    // 4. Unpack your inner wrapper envelope return payload body string text array
-    const resultWrapper = await brokerResponse.json();
-    
-    // A standard operational response code of 200 OK from the downstream target means delivery cleared safely
-    if (resultWrapper.status !== 200) {
-      console.warn(`Downstream diagnostic metadata target failed with remote status code: ${resultWrapper.status}`);
-      return false;
-    }
-
-    const text = resultWrapper.body || "";
-    console.log(text);
-    return text.includes('Edmx'); // Standard basic schema structure validation check pass criteria
+    return await testServiceMetadata(baseUrl);
   } catch (e) {
     console.error(`Test failed for ${baseUrl}:`, e);
     return false;
