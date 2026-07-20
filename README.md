@@ -8,7 +8,7 @@ A lightweight mobile asset for [Android Hybrid Mobile](https://github.com/otvnvs
 [Launch in Asset Delivery Scanner](https://otvnvs.github.io/ahm-asset-delivery-scanner/)
 
 
-**Direct Install Link:** [ahm-app://deploy?package_url=ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip](ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip)
+**Direct Install Link:** [ahm-app://deploy?package_url=ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip/dist](ahm-app://deploy?package_url=https://github.com/otvnvs/ahm-asset-delivery-scanner/archive/refs/heads/main.zip/dist)
 
 ## Features
 
