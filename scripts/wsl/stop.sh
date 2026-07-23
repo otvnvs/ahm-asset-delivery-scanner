@@ -2,11 +2,12 @@
 DEVICE=$1
 ADB=/mnt/c/usr/bin/adb.exe
 PACKAGENAME=com.example.app
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 echo stopping $PACKAGENAME
 if [ -z "$DEVICE" ]
 then
 	$ADB devices|grep -v attached|grep device|cut -f1|while read DEVICE;do
-		./scripts/stop.sh $DEVICE
+		$SCRIPT_DIR/stop.sh $DEVICE
 	done
 else
 	echo stopping android application
